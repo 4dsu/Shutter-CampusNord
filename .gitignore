@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.vite/
+coverage/
+# Dades en brut descarregades per l'importador del mapa (es regeneren amb npm run map:import)
+tools/map-import/.cache/

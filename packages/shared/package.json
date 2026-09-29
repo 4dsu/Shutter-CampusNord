@@ -1,0 +1,17 @@
+{
+  "name": "@shutter/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./constants": "./src/constants.ts",
+    "./protocol": "./src/protocol/index.ts",
+    "./sim": "./src/sim/index.ts",
+    "./map": "./src/map/index.ts",
+    "./physics": "./src/physics/index.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "earcut": "^3.2.4"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "shutter-campus-nord",
+  "private": true,
+  "type": "module",
+  "description": "Shooter 3D multijugador al navegador ambientat al Campus Nord de la UPC",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev -w @shutter/server\" \"npm run dev -w @shutter/client\"",
+    "build": "npm run build -w @shutter/client",
+    "start": "node apps/server/src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/client && tsc -p tools/map-import",
+    "map:import": "node tools/map-import/src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

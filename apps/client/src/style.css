@@ -1,0 +1,51 @@
+:root {
+  color-scheme: dark;
+  --hud-fg: #f4f1ea;
+  --hud-bg: rgba(12, 14, 18, 0.62);
+  --accent: #ffb000;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0c0e12;
+  color: var(--hud-fg);
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.viewer-info {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--hud-bg);
+  font-size: 11px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer-info .hint {
+  opacity: 0.75;
+}
