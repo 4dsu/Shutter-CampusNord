@@ -63,6 +63,8 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 ## Fase 6 — Desplegament ⏳
 
 - [ ] Dockerfile i build de producció
+- [ ] Compressió (gzip/brotli) dels fitxers estàtics: ara el JS fa 4,9 MB (1,8 MB comprimit) i el mapa 732 KB (292 KB)
+- [ ] Opcional: `@dimforge/rapier3d` amb el `.wasm` a part en lloc de la versió `-compat` (base64), per carregar menys
 - [ ] Allotjament (per decidir: VPS o Fly.io/Railway), HTTPS/WSS i enllaç públic
 
 ## Registre de decisions
