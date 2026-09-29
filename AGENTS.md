@@ -43,8 +43,10 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 | `packages/shared/src/sim/` | Simulació determinista del jugador i les armes (fase 2) |
 | `packages/shared/src/physics/` | Construcció del món Rapier a partir del mapa (fase 2) |
 | `packages/shared/src/protocol/` | Missatges binaris client↔servidor (fase 3) |
-| `apps/client/src/render/` | Escena Three.js: terreny, façanes, objectes, rètols, cel |
-| `apps/client/src/debug/` | Eines de depuració (càmera lliure del visor) |
+| `apps/client/src/render/` | Escena Three.js: terreny, façanes, objectes, rètols, cel, personatges |
+| `apps/client/src/game/` | Joc en primera persona: bucle de 60 Hz, input, arma en primera persona, efectes, dianes |
+| `apps/client/src/ui/`, `apps/client/src/audio/` | HUD (DOM) i sons sintetitzats (WebAudio) |
+| `apps/client/src/viewer.ts`, `apps/client/src/debug/` | Visor del mapa amb càmera lliure (`?mode=viewer`) |
 | `apps/server/src/` | Servidor HTTP + WebSocket (`index.ts`), fitxers estàtics (`static.ts`) |
 | `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `projection.ts` |
 | `assets/maps/campus-nord.json` | Mapa generat. **No l'editis a mà**: canvia l'importador o `overrides.ts` i torna a executar-lo |
@@ -89,6 +91,13 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 
 - Imita el codi del voltant: comentaris breus en català que expliquen el *perquè*, funcions petites i sense abstraccions prematures.
 - Cap dependència nova sense motiu clar. Si n'afegeixes una, explica al PR per què.
+
+### Proves al navegador
+
+- **`?mode=viewer`:** visor del mapa amb càmera lliure. Amb `&cam=x,y,z,yaw,pitch` es posa la càmera en un punt concret.
+- **`?nolock=1`:** el joc accepta teclat i clics sense capturar el ratolí. Així un agent pot enviar esdeveniments amb JavaScript.
+- **Depuració (només en desenvolupament):** `window.__shutter` exposa `state`, `weapons`, `input` (yaw/pitch/arma), `physics` i `dummies` (`list()`).
+  Exemple: apunta amb `input.yaw`/`input.pitch` i dispara amb `document.dispatchEvent(new MouseEvent('mousedown', { button: 0 }))`.
 
 ## 5. Flux de treball (branques + Pull Requests)
 

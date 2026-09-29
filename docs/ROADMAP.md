@@ -23,16 +23,19 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [ ] Millora pendent: murs de contenció amb desnivell sec (ara el terreny hi fa una rampa suau)
 - [ ] Millora pendent: textura de terra més nítida de prop (textura de detall o decals de camí)
 
-## Fase 2 — FPS en solitari 🚧
+## Fase 2 — FPS en solitari 🚧 (PR #1, branca `fase-2/fps-en-solitari`)
 
-- [ ] Món de col·lisions Rapier compartit (`packages/shared/src/physics/`): terreny, edificis, murs i objectes (troncs, fanals, bancs)
-- [ ] Simulació determinista del jugador (`packages/shared/src/sim/player.ts`): caminar, córrer, ajupir-se, saltar, esglaons ≤ 0,4 m, pendent ≤ 45°
-- [ ] Control en primera persona al client (Pointer Lock, pas fix de 60 Hz, interpolació del render)
-- [ ] Armes hitscan (pistola, fusell, escopeta): cadència, dispersió, retrocés, recàrrega, munició, dany al cap ×2
-- [ ] Dianes/ninots per provar els trets
-- [ ] HUD bàsic: punt de mira, vida, munició, arma, hit markers
-- [ ] So amb WebAudio (trets, impactes, passes)
-- [ ] Tests: determinisme de `stepPlayer`, col·lisions contra el mapa real, dany i cadència
+- [x] Món de col·lisions Rapier compartit (`packages/shared/src/physics/`): terreny, edificis, murs, límit jugable i objectes (troncs, fanals, bancs…)
+- [x] Simulació determinista del jugador (`packages/shared/src/sim/player.ts`): caminar, córrer, ajupir-se, saltar, esglaons ≤ 0,42 m, pendent ≤ 46°
+- [x] Control en primera persona al client (Pointer Lock, pas fix de 60 Hz, càmera interpolada entre ticks)
+- [x] Armes hitscan (pistola, fusell, escopeta): cadència, dispersió determinista, retrocés amb recuperació, recàrrega, munició, dany al cap ×2 i caiguda per distància
+- [x] Dianes d'entrenament (fixes i mòbils) amb reaparició, col·locades on es veuen des del punt d'inici
+- [x] Arma en primera persona, traçadores, espurnes, forats de bala i flaix del canó
+- [x] HUD: punt de mira dinàmic, hit markers (cos/cap/baixa), vida, munició, marcador i pantalla d'inici/pausa
+- [x] So sintetitzat amb WebAudio (trets per arma, impactes, passes, recàrrega)
+- [x] Tests: determinisme de `stepPlayer`, col·lisions contra el mapa real, salt, cadència, recàrrega i impactes
+- [ ] Revisió de sensacions de joc amb persones (sensibilitat, velocitats, retrocés) → ajustar `PLAYER` i `WEAPONS`
+- [ ] Opcions bàsiques (sensibilitat, FOV, volum) — es pot deixar per a la fase 4
 
 ## Fase 3 — Multijugador ⏳
 
