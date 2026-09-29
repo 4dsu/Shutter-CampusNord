@@ -17,7 +17,7 @@
     "start": "node apps/server/src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/client && tsc -p tools/map-import",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/shared/tsconfig.test.json && tsc -p apps/server && tsc -p apps/client && tsc -p tools/map-import",
     "map:import": "node tools/map-import/src/index.ts"
   },
   "devDependencies": {

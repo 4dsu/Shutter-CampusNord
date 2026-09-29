@@ -5,7 +5,7 @@ El mapa es genera a partir de dades reals: edificis, camins, arbres i mobiliari 
 
 ![Vista general del Campus Nord generat](docs/img/campus-vista-general.jpg)
 
-> **Estat:** en desenvolupament. Les fases 0 (esquelet) i 1 (mapa) estan fetes; la fase 2 (FPS en solitari) està en curs.
+> **Estat:** en desenvolupament. Fases 0 (esquelet) i 1 (mapa) fetes; la fase 2 (FPS en solitari amb dianes) és jugable i està en revisió.
 > Vegeu el [full de ruta](docs/ROADMAP.md).
 
 ## Com provar-ho
@@ -17,7 +17,12 @@ npm install
 npm run dev
 ```
 
-Obre <http://localhost:5173>. De moment hi ha el visor del mapa: clica per capturar el ratolí, mou-te amb **WASD**, **Espai/Q** per pujar i baixar i **Maj.** per anar ràpid.
+Obre <http://localhost:5173> i clica per jugar el mode entrenament:
+
+- **Moviment:** **WASD** per moure't, **Espai** per saltar, **Maj.** per córrer i **C** per ajupir-te.
+- **Armes:** clic esquerre per disparar, **R** per recarregar i **1 2 3** o la roda del ratolí per canviar d'arma.
+
+Amb `?mode=viewer` hi ha un visor del mapa amb càmera lliure.
 
 | Ordre | Què fa |
 | --- | --- |

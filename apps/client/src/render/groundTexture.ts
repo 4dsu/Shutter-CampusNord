@@ -9,7 +9,7 @@ const AREA_COLORS: Record<AreaKind, string> = {
   dirt: "#a88f6c",
   parking: "#66686b",
   asphalt: "#5c5e61",
-  paving: "#b3ac9d",
+  paving: "#a39c8d",
   water: "#4e8db5",
 };
 
@@ -21,9 +21,9 @@ const PATH_STYLE: Record<PathKind, { color: string; edge?: string }> = {
   service: { color: "#8f8b83" },
   cycleway: { color: "#9b5d4c" },
   path: { color: "#c9b99c" },
-  footway: { color: "#bfb7a6" },
-  pedestrian: { color: "#b9b1a0" },
-  steps: { color: "#cbc3b2" },
+  footway: { color: "#aea695" },
+  pedestrian: { color: "#a8a090" },
+  steps: { color: "#b9b1a0" },
 };
 
 const PATH_ORDER: PathKind[] = ["street", "service", "cycleway", "path", "pedestrian", "footway", "steps"];
@@ -54,7 +54,7 @@ export function bakeGround(map: MapData, terrain: TerrainField, metersPerPixel: 
   ctx.fillRect(terrain.originX, terrain.originZ, width, depth);
   ctx.beginPath();
   ring(map.playArea);
-  ctx.fillStyle = "#a9a293";
+  ctx.fillStyle = "#978f80";
   ctx.fill();
 
   for (const kind of AREA_ORDER) {

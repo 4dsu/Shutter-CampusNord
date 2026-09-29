@@ -49,3 +49,260 @@ body {
 .viewer-info .hint {
   opacity: 0.75;
 }
+
+/* ---------- HUD del joc ---------- */
+
+.crosshair {
+  --gap: 6px;
+  --len: 8px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.crosshair i,
+.crosshair .dot {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.crosshair .dot {
+  width: 2px;
+  height: 2px;
+  left: -1px;
+  top: -1px;
+}
+
+.crosshair .t,
+.crosshair .b {
+  width: 2px;
+  height: var(--len);
+  left: -1px;
+}
+
+.crosshair .t {
+  bottom: var(--gap);
+}
+
+.crosshair .b {
+  top: var(--gap);
+}
+
+.crosshair .l,
+.crosshair .r {
+  height: 2px;
+  width: var(--len);
+  top: -1px;
+}
+
+.crosshair .l {
+  right: var(--gap);
+}
+
+.crosshair .r {
+  left: var(--gap);
+}
+
+.hitmarker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+}
+
+.hitmarker i {
+  position: absolute;
+  width: 2px;
+  height: 9px;
+  background: #fff;
+  left: -1px;
+  top: -4px;
+}
+
+.hitmarker i:nth-child(1) {
+  transform: rotate(45deg) translateY(-11px);
+}
+.hitmarker i:nth-child(2) {
+  transform: rotate(135deg) translateY(-11px);
+}
+.hitmarker i:nth-child(3) {
+  transform: rotate(225deg) translateY(-11px);
+}
+.hitmarker i:nth-child(4) {
+  transform: rotate(315deg) translateY(-11px);
+}
+
+.hitmarker[data-kind="head"] i {
+  background: #ffd23f;
+}
+
+.hitmarker[data-kind="kill"] i {
+  background: #ff4040;
+}
+
+.hitmarker.show {
+  animation: hitmarker 0.22s ease-out;
+}
+
+@keyframes hitmarker {
+  from {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.hud-panel {
+  position: absolute;
+  bottom: 18px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--hud-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-left {
+  left: 18px;
+  min-width: 150px;
+}
+
+.hud-right {
+  right: 18px;
+  text-align: right;
+}
+
+.hud-health {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hud-bar-track {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.hud-bar {
+  height: 100%;
+  background: #7ddc7a;
+  transition: width 0.15s;
+}
+
+.hud-weapon {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.hud-ammo {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.hud-ammo.low {
+  color: #ff6b5b;
+}
+
+.hud-score {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--hud-bg);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-feed {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.hud-feed-line {
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: var(--hud-bg);
+  font-size: 13px;
+  animation: feed-in 0.2s ease-out;
+}
+
+@keyframes feed-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 14, 0.55);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-card {
+  width: min(440px, calc(100% - 32px));
+  padding: 22px 24px;
+  border-radius: 12px;
+  background: rgba(16, 19, 25, 0.9);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.overlay-card h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.overlay-card p {
+  margin: 0 0 14px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.overlay-keys {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.overlay-keys kbd {
+  display: inline-block;
+  min-width: 64px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
+}

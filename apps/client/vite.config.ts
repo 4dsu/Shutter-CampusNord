@@ -14,5 +14,7 @@ export default defineConfig({
     target: "es2022",
     outDir: "dist",
     emptyOutDir: true,
+    // Rapier porta el WASM incrustat en base64 (~3 MB): el paquet principal és gran a propòsit.
+    chunkSizeWarningLimit: 6000,
   },
 });
