@@ -314,3 +314,644 @@ function addBox(mb: MeshBuilder, a: Vec2, b: Vec2, px: number, pz: number, botto
   quad([aL[0], bottom, aL[1]], [aR[0], bottom, aR[1]], [aR[0], topA, aR[1]], [aL[0], topA, aL[1]]);
   quad([bR[0], bottom, bR[1]], [bL[0], bottom, bL[1]], [bL[0], topB, bL[1]], [bR[0], topB, bR[1]]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Kits de façana amb relleu (només render: la col·lisió és la closca de buildBuildingsMesh).
+// Tot el relleu va cap endins del pla del contorn, de manera que res no sobresurt de la col·lisió.
+
+type P3 = [number, number, number];
+
+/** Quadrilàter amb la normal indicada: l'ordre dels triangles s'ajusta sol perquè la cara miri cap a `n`. */
+function quad(mb: MeshBuilder, p: [P3, P3, P3, P3], n: P3, uv: [number, number][], extra: Record<string, number[]> = {}): void {
+  const [p0, p1, p2] = p;
+  const ux = p1[0] - p0[0];
+  const uy = p1[1] - p0[1];
+  const uz = p1[2] - p0[2];
+  const vx = p2[0] - p0[0];
+  const vy = p2[1] - p0[1];
+  const vz = p2[2] - p0[2];
+  const gx = uy * vz - uz * vy;
+  const gy = uz * vx - ux * vz;
+  const gz = ux * vy - uy * vx;
+  const i = p.map((q, k) => mb.vertex(q[0], q[1], q[2], n[0], n[1], n[2], uv[k][0], uv[k][1], extra));
+  if (gx * n[0] + gy * n[1] + gz * n[2] >= 0) {
+    mb.triangle(i[0], i[1], i[2]);
+    mb.triangle(i[0], i[2], i[3]);
+  } else {
+    mb.triangle(i[0], i[2], i[1]);
+    mb.triangle(i[0], i[3], i[2]);
+  }
+}
+
+/**
+ * Sistema local d'un tram de façana: t al llarg del tram (0..L), y amunt (absoluta), d cap enfora (normal exterior).
+ * UV en metres: u = t, v = alçada sobre la planta baixa.
+ */
+class EdgeFrame {
+  readonly L: number;
+  readonly N: P3;
+  readonly U: P3;
+  readonly Um: P3;
+  readonly Nm: P3;
+  private readonly a: Vec2;
+  private readonly ux: number;
+  private readonly uz: number;
+  private readonly base: number;
+
+  constructor(a: Vec2, c: Vec2, baseY: number) {
+    this.a = a;
+    const dx = c[0] - a[0];
+    const dz = c[1] - a[1];
+    this.L = Math.hypot(dx, dz);
+    this.ux = dx / this.L;
+    this.uz = dz / this.L;
+    // Normal exterior (vegeu addWallRing): anell exterior amb àrea positiva.
+    this.N = [this.uz, 0, -this.ux];
+    this.Nm = [-this.uz, 0, this.ux];
+    this.U = [this.ux, 0, this.uz];
+    this.Um = [-this.ux, 0, -this.uz];
+    this.base = baseY;
+  }
+
+  P(t: number, y: number, d: number): P3 {
+    return [this.a[0] + this.ux * t + this.N[0] * d, y, this.a[1] + this.uz * t + this.N[2] * d];
+  }
+
+  /** Cara que mira enfora (o endins amb `inward`), en el pla de profunditat d. */
+  front(mb: MeshBuilder, t0: number, t1: number, y0: number, y1: number, d: number, extra: Record<string, number[]> = {}, inward = false): void {
+    const b = this.base;
+    quad(mb, [this.P(t0, y0, d), this.P(t1, y0, d), this.P(t1, y1, d), this.P(t0, y1, d)], inward ? this.Nm : this.N, [
+      [t0, y0 - b],
+      [t1, y0 - b],
+      [t1, y1 - b],
+      [t0, y1 - b],
+    ], extra);
+  }
+
+  /** Cara perpendicular a la façana a la posició t, entre les profunditats d0 i d1. */
+  side(mb: MeshBuilder, t: number, y0: number, y1: number, d0: number, d1: number, n: P3, extra: Record<string, number[]> = {}): void {
+    quad(mb, [this.P(t, y0, d0), this.P(t, y0, d1), this.P(t, y1, d1), this.P(t, y1, d0)], n, [
+      [d0, y0],
+      [d1, y0],
+      [d1, y1],
+      [d0, y1],
+    ], extra);
+  }
+
+  /** Cara horitzontal a l'alçada y entre les profunditats d0 i d1. */
+  flat(mb: MeshBuilder, t0: number, t1: number, y: number, d0: number, d1: number, up: boolean, extra: Record<string, number[]> = {}): void {
+    quad(mb, [this.P(t0, y, d0), this.P(t1, y, d0), this.P(t1, y, d1), this.P(t0, y, d1)], up ? [0, 1, 0] : [0, -1, 0], [
+      [t0, d0],
+      [t1, d0],
+      [t1, d1],
+      [t0, d1],
+    ], extra);
+  }
+
+  /** Ampit del terrat: cara exterior, capçal i cara interior. */
+  parapet(mb: MeshBuilder, yTop: number, h: number, depth: number, extra: Record<string, number[]> = {}): void {
+    this.front(mb, 0, this.L, yTop, yTop + h, 0, extra);
+    this.flat(mb, 0, this.L, yTop + h, 0, -depth, true, extra);
+    this.front(mb, 0, this.L, yTop, yTop + h, -depth, extra, true);
+  }
+}
+
+export interface FacadeKitMeshes {
+  brick: MeshData;
+  concrete: MeshData;
+  glass: MeshData;
+  /** Alumini: lamel·les, muntants i fusteria. */
+  metal: MeshData;
+  /** Arrebossat amb el color de cada edifici (atribut `color`, sRGB). */
+  plaster: MeshData;
+  /** Plaques de pedra clara (Biblioteca). */
+  stone: MeshData;
+}
+
+/** Mides del kit A–D (m). La graella de formigó queda a ras del contorn; el maó i les finestres, enfonsats. */
+export const CAMPUS_KIT = {
+  bay: 3.6,
+  pillar: 0.36,
+  slab: 0.32,
+  panelDepth: 0.22,
+  windowDepth: 0.16,
+  parapet: 0.9,
+  louvers: 7,
+} as const;
+
+/** Quins edificis tenen façana amb relleu (la resta es dibuixen amb la closca i el patró del shader). */
+export function hasFacadeKit(b: BuildingData): boolean {
+  return !b.background && b.facade !== "strips";
+}
+
+interface KitBuilders {
+  brick: MeshBuilder;
+  concrete: MeshBuilder;
+  glass: MeshBuilder;
+  metal: MeshBuilder;
+  plaster: MeshBuilder;
+  stone: MeshBuilder;
+}
+
+/** Edificis A–D: pilars i forjats de formigó, plafons de maó i una finestra vertical amb lamel·les per crugia. */
+function campusEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const K = CAMPUS_KIT;
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.concrete, yTop, K.parapet, 0.3);
+  if (L < K.bay * 0.5) {
+    f.front(k.concrete, 0, L, yb, yTop, 0);
+    return;
+  }
+  const bays = Math.max(1, Math.round(L / K.bay));
+  const w = L / bays;
+  const hp = K.pillar / 2;
+  const D1 = -K.panelDepth;
+  const D2 = -(K.panelDepth + K.windowDepth);
+  for (let i = 0; i <= bays; i++) {
+    const t0 = Math.max(0, i * w - hp);
+    const t1 = Math.min(L, i * w + hp);
+    f.front(k.concrete, t0, t1, yb, yTop, 0);
+    if (i > 0) f.side(k.concrete, t0, yb, yTop, 0, D1, f.Um);
+    if (i < bays) f.side(k.concrete, t1, yb, yTop, 0, D1, f.U);
+  }
+  for (let fl = 0; fl <= floors; fl++) {
+    const yf = yb + fl * floorH;
+    const y0 = fl === 0 ? yb : yf - K.slab / 2;
+    const y1 = fl === floors ? yTop : fl === 0 ? yb + K.slab : yf + K.slab / 2;
+    f.front(k.concrete, 0, L, y0, y1, 0);
+    if (fl > 0) f.flat(k.concrete, 0, L, y0, 0, D1, false);
+    if (fl < floors) f.flat(k.concrete, 0, L, y1, 0, D1, true);
+  }
+  for (let fl = 0; fl < floors; fl++) {
+    const y0 = fl === 0 ? yb + K.slab : yb + fl * floorH + K.slab / 2;
+    const y1 = fl === floors - 1 ? yTop - K.slab / 2 : yb + (fl + 1) * floorH - K.slab / 2;
+    for (let i = 0; i < bays; i++) {
+      const t0 = i * w + hp;
+      const t1 = (i + 1) * w - hp;
+      const ww = Math.min(1.0, (t1 - t0) * 0.32);
+      const wx1 = t1 - 0.3;
+      const wx0 = wx1 - ww;
+      const wy0 = y0 + 0.3;
+      const wy1 = y1 - 0.12;
+      f.front(k.brick, t0, wx0, y0, y1, D1);
+      f.front(k.brick, wx1, t1, y0, y1, D1);
+      f.front(k.brick, wx0, wx1, y0, wy0, D1);
+      f.front(k.brick, wx0, wx1, wy1, y1, D1);
+      f.side(k.concrete, wx0, wy0, wy1, D1, D2, f.U);
+      f.side(k.concrete, wx1, wy0, wy1, D1, D2, f.Um);
+      f.flat(k.concrete, wx0, wx1, wy0, D1, D2, true);
+      f.flat(k.concrete, wx0, wx1, wy1, D1, D2, false);
+      f.front(k.glass, wx0, wx1, wy0, wy1, D2);
+      const slat = (wy1 - wy0) / K.louvers;
+      for (let s = 0; s < K.louvers; s++) {
+        const ly = wy0 + s * slat + slat * 0.25;
+        f.front(k.metal, wx0 + 0.02, wx1 - 0.02, ly, ly + slat * 0.45, D1 - 0.04);
+      }
+    }
+  }
+}
+
+/** Trams més curts que això no tenen porxo. */
+export const ARCADE_MIN_EDGE = 8;
+
+/** Mides del kit de la fila A (m), a partir de fotos del campus (Mapillary, 2025). */
+export const ARCADE_KIT = {
+  pillarSpacing: 5.4,
+  pillar: 0.9,
+  /** Profunditat del porxo: la paret de vidre de la planta baixa és 3 m endins. */
+  portico: 3,
+  windowSpacing: 2.7,
+  windowWidth: 0.9,
+  reveal: 0.3,
+  cornice: 1.1,
+} as const;
+
+/**
+ * Fila A: porxo a la planta baixa (pilars quadrats de formigó a ras del contorn, sostre i paret vidrada enfonsats),
+ * plantes de maó amb finestres retallades i una cornisa de formigó a dalt.
+ * La col·lisió (buildArcadeCollision) segueix la mateixa forma: es pot caminar sota el porxo.
+ */
+function arcadeEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const K = ARCADE_KIT;
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const y1 = yb + floorH; // sostre del porxo
+  // Sòcol només als trams sense porxo: sota el porxo s'hi camina.
+  if (L < ARCADE_MIN_EDGE && b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.concrete, yTop, 0.6, 0.3);
+
+  // Planta baixa: porxo als trams llargs, maó massís als curts.
+  if (L >= ARCADE_MIN_EDGE) {
+    const D = -K.portico;
+    const n = Math.max(1, Math.round(L / K.pillarSpacing));
+    const hp = K.pillar / 2;
+    // Paret del fons: sòcol de maó (fins al terreny, que pot quedar per sota de la planta baixa) i vidre.
+    const bottom = b.minHeight > 0 ? yb : b.footY;
+    f.front(k.brick, 0, L, bottom, yb + 0.6, D);
+    f.front(k.glass, 0, L, yb + 0.6, y1 - 0.4, D);
+    f.front(k.concrete, 0, L, y1 - 0.4, y1, D);
+    // Sostre del porxo i caps dels extrems.
+    f.flat(k.concrete, 0, L, y1, 0, D, false);
+    f.side(k.concrete, 0, bottom, y1, 0, D, f.U);
+    f.side(k.concrete, L, bottom, y1, 0, D, f.Um);
+    for (let i = 0; i <= n; i++) {
+      const t = (i * L) / n;
+      const t0 = Math.max(0, t - hp);
+      const t1 = Math.min(L, t + hp);
+      f.front(k.concrete, t0, t1, bottom, y1, 0);
+      f.front(k.concrete, t0, t1, bottom, y1, -K.pillar, {}, true);
+      if (i > 0) f.side(k.concrete, t0, bottom, y1, 0, -K.pillar, f.Um);
+      if (i < n) f.side(k.concrete, t1, bottom, y1, 0, -K.pillar, f.U);
+    }
+  } else {
+    f.front(k.brick, 0, L, yb, y1, 0);
+  }
+
+  // Plantes de maó amb finestres retallades.
+  const topY = yTop - K.cornice;
+  f.front(k.concrete, 0, L, topY, yTop, 0); // cornisa
+  f.front(k.concrete, 0, L, y1, y1 + 0.35, 0); // cantell del forjat del porxo
+  const n = Math.max(1, Math.round(L / K.windowSpacing));
+  const w = L / n;
+  const ww = Math.min(K.windowWidth, w * 0.5);
+  const D = -K.reveal;
+  for (let fl = 1; fl < floors; fl++) {
+    const y0 = fl === 1 ? y1 + 0.35 : yb + fl * floorH;
+    const yf = Math.min(topY, yb + (fl + 1) * floorH);
+    if (yf <= y0 + 0.5) continue;
+    const wy0 = y0 + Math.min(0.9, (yf - y0) * 0.3);
+    const wy1 = yf - Math.min(0.45, (yf - y0) * 0.14);
+    if (L < 2 || wy1 <= wy0) {
+      f.front(k.brick, 0, L, y0, yf, 0);
+      continue;
+    }
+    for (let i = 0; i < n; i++) {
+      const t0 = i * w;
+      const wx0 = t0 + (w - ww) / 2;
+      const wx1 = wx0 + ww;
+      f.front(k.brick, t0, wx0, y0, yf, 0);
+      f.front(k.brick, wx1, t0 + w, y0, yf, 0);
+      f.front(k.brick, wx0, wx1, y0, wy0, 0);
+      f.front(k.brick, wx0, wx1, wy1, yf, 0);
+      f.side(k.brick, wx0, wy0, wy1, 0, D, f.U);
+      f.side(k.brick, wx1, wy0, wy1, 0, D, f.Um);
+      f.flat(k.concrete, wx0, wx1, wy0, 0, D, true);
+      f.flat(k.brick, wx0, wx1, wy1, 0, D, false);
+      f.front(k.glass, wx0, wx1, wy0, wy1, D);
+      // Fusteria (marc exterior i travesser).
+      f.front(k.metal, wx0, wx1, wy1 - 0.06, wy1, D + 0.02);
+      f.front(k.metal, wx0, wx1, wy0 + (wy1 - wy0) * 0.35, wy0 + (wy1 - wy0) * 0.35 + 0.05, D + 0.02);
+    }
+  }
+}
+
+/**
+ * B3 (Telecos): maó amb finestres retallades, vidrieres a la planta baixa i una franja vertical de vidre al centre
+ * dels trams llargs (escala), amb plafons de lamel·les horitzontals a les plantes altes.
+ */
+function brickEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.brick, yTop, 0.8, 0.3);
+  const D = -0.3;
+  // Franja vertical de vidre (només als trams llargs).
+  const band = L >= 14 ? { t0: L / 2 - 1.6, t1: L / 2 + 1.6 } : null;
+  const n = Math.max(1, Math.round(L / 2.8));
+  const w = L / n;
+  for (let fl = 0; fl < floors; fl++) {
+    const y0 = yb + fl * floorH;
+    const y1 = y0 + floorH;
+    const inBand = (t0: number, t1: number): boolean => !!band && t1 > band.t0 && t0 < band.t1;
+    for (let i = 0; i < n; i++) {
+      const t0 = i * w;
+      const t1 = t0 + w;
+      if (inBand(t0, t1)) continue;
+      // Planta baixa: vidrieres grans; plantes altes: finestres retallades (una de cada tres, plafó de lamel·les).
+      const ww = fl === 0 ? w * 0.7 : Math.min(1.1, w * 0.42);
+      const wx0 = t0 + (w - ww) / 2;
+      const wx1 = wx0 + ww;
+      const wy0 = fl === 0 ? y0 + 0.25 : y0 + Math.min(0.9, floorH * 0.28);
+      const wy1 = y1 - Math.min(0.45, floorH * 0.14);
+      f.front(k.brick, t0, wx0, y0, y1, 0);
+      f.front(k.brick, wx1, t1, y0, y1, 0);
+      f.front(k.brick, wx0, wx1, y0, wy0, 0);
+      f.front(k.brick, wx0, wx1, wy1, y1, 0);
+      f.side(k.brick, wx0, wy0, wy1, 0, D, f.U);
+      f.side(k.brick, wx1, wy0, wy1, 0, D, f.Um);
+      f.flat(k.concrete, wx0, wx1, wy0, 0, D, true);
+      f.flat(k.brick, wx0, wx1, wy1, 0, D, false);
+      f.front(k.glass, wx0, wx1, wy0, wy1, D);
+      if (fl > 0 && i % 3 === 1) {
+        const slats = 8;
+        const sh = (wy1 - wy0) / slats;
+        for (let s = 0; s < slats; s++) f.front(k.metal, wx0 + 0.02, wx1 - 0.02, wy0 + s * sh, wy0 + s * sh + sh * 0.55, D + 0.12);
+      }
+    }
+  }
+  if (band) {
+    // Franja de vidre de dalt a baix, amb muntants i el forjat de cada planta marcat.
+    f.front(k.glass, band.t0, band.t1, yb, yTop, -0.25);
+    f.side(k.brick, band.t0, yb, yTop, 0, -0.25, f.Um);
+    f.side(k.brick, band.t1, yb, yTop, 0, -0.25, f.U);
+    // Omple els trossos de maó entre la franja i les crugies veïnes.
+    const i0 = Math.floor(band.t0 / w);
+    const i1 = Math.min(n - 1, Math.floor(band.t1 / w));
+    if (band.t0 > i0 * w) f.front(k.brick, i0 * w, band.t0, yb, yTop, 0);
+    if (band.t1 < (i1 + 1) * w) f.front(k.brick, band.t1, (i1 + 1) * w, yb, yTop, 0);
+    for (let m = 0; m <= 3; m++) {
+      const t = band.t0 + ((band.t1 - band.t0) * m) / 3;
+      f.front(k.metal, Math.max(band.t0, t - 0.04), Math.min(band.t1, t + 0.04), yb, yTop, -0.22);
+    }
+    for (let fl = 1; fl < floors; fl++) {
+      const y = yb + fl * floorH;
+      f.front(k.metal, band.t0, band.t1, y - 0.12, y + 0.12, -0.22);
+    }
+  }
+}
+
+/** Mides de l'obertura en diagonal de la Biblioteca (fraccions del tram i m), a partir de fotos de referència. */
+// El tall queda al primer terç del tram perquè el rètol (centrat a dalt) no el tapi.
+export const LIBRARY_CUT = { start: 0.04, drift: 0.18, width: 0.13, depth: 2.5 } as const;
+
+/**
+ * Biblioteca: plaques massisses de pedra clara i una franja de vidre fosc a la planta baixa. A la façana principal
+ * (`main`), un gran tall en diagonal enfonsat que puja cap a un costat (tret característic de l'edifici).
+ */
+function stoneEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders, main: boolean): void {
+  const L = f.L;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.stone, 0, L, b.footY, yb, 0);
+  const glassTop = yb + Math.min(4.2, b.height * 0.3);
+  const D = -0.5;
+  if (L < 6) {
+    f.front(k.stone, 0, L, yb, yTop, 0);
+    f.parapet(k.stone, yTop, 0.5, 0.35);
+    return;
+  }
+  // Planta baixa vidrada i enfonsada sota la massa de pedra.
+  f.front(k.glass, 0, L, yb, glassTop, D);
+  f.flat(k.stone, 0, L, glassTop, 0, D, false);
+  f.side(k.stone, 0, yb, glassTop, 0, D, f.U);
+  f.side(k.stone, L, yb, glassTop, 0, D, f.Um);
+  const m = Math.max(1, Math.round(L / 1.8));
+  for (let i = 1; i < m; i++) {
+    const t = (i * L) / m;
+    f.front(k.metal, t - 0.04, t + 0.04, yb, glassTop, D + 0.02);
+  }
+  f.parapet(k.stone, yTop, 0.5, 0.35);
+  if (!main) {
+    f.front(k.stone, 0, L, glassTop, yTop, 0);
+    return;
+  }
+
+  // Tall en diagonal: paral·lelogram que va de (x0, glassTop) fins a (x0 + s, yTop), d'amplada w.
+  const C = LIBRARY_CUT;
+  const x0 = L * C.start;
+  const s = L * C.drift;
+  const w = L * C.width;
+  const H = yTop - glassTop;
+  const Dc = -C.depth;
+  const bse = b.baseY;
+  const uv = (t: number, y: number): [number, number] => [t, y - bse];
+  const face = (mb: MeshBuilder, pts: [number, number, number][], n: P3): void =>
+    quad(mb, pts.map(([t, y, d]) => f.P(t, y, d)) as [P3, P3, P3, P3], n, pts.map(([t, y]) => uv(t, y)));
+  // Pedra a banda i banda del tall.
+  face(k.stone, [[0, glassTop, 0], [x0, glassTop, 0], [x0 + s, yTop, 0], [0, yTop, 0]], f.N);
+  face(k.stone, [[x0 + w, glassTop, 0], [L, glassTop, 0], [L, yTop, 0], [x0 + s + w, yTop, 0]], f.N);
+  // Fons del tall: vidre fosc.
+  face(k.glass, [[x0, glassTop, Dc], [x0 + w, glassTop, Dc], [x0 + s + w, yTop, Dc], [x0 + s, yTop, Dc]], f.N);
+  // Cares laterals inclinades del tall (normal perpendicular a la diagonal, dins del pla de la façana).
+  const len = Math.hypot(s, H);
+  const toWorld = (nt: number, ny: number): P3 => [f.U[0] * nt, ny, f.U[2] * nt];
+  face(k.stone, [[x0, glassTop, 0], [x0 + s, yTop, 0], [x0 + s, yTop, Dc], [x0, glassTop, Dc]], toWorld(H / len, -s / len));
+  face(k.stone, [[x0 + w, glassTop, 0], [x0 + w + s, yTop, 0], [x0 + w + s, yTop, Dc], [x0 + w, glassTop, Dc]], toWorld(-H / len, s / len));
+  // Sostre del tall a baix (sobre la franja vidrada) i coronament obert a dalt.
+  f.flat(k.stone, x0, x0 + w, glassTop, 0, Dc, true);
+}
+
+/** BSC: mur de vidre enfonsat amb lamel·les verticals blanques cada 0,6 m i forjats marcats. */
+function finsEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const DG = -0.55;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.concrete, yTop, 0.6, 0.3);
+  f.front(k.glass, 0, L, yb, yTop, DG);
+  f.side(k.concrete, 0, yb, yTop, 0, DG, f.U);
+  f.side(k.concrete, L, yb, yTop, 0, DG, f.Um);
+  for (let fl = 1; fl < floors; fl++) {
+    const y = yb + fl * floorH;
+    f.flat(k.concrete, 0, L, y + 0.15, 0, DG, true);
+    f.flat(k.concrete, 0, L, y - 0.15, 0, DG, false);
+    f.front(k.concrete, 0, L, y - 0.15, y + 0.15, 0);
+  }
+  const n = Math.max(1, Math.round(L / 0.6));
+  for (let i = 0; i <= n; i++) {
+    const t = (i * L) / n;
+    const t0 = Math.max(0, t - 0.05);
+    const t1 = Math.min(L, t + 0.05);
+    // Les lamel·les no arriben a terra: deixen la planta baixa oberta a la vista.
+    f.front(k.metal, t0, t1, yb + Math.min(3, floorH), yTop, 0);
+    if (i > 0) f.side(k.metal, t0, yb + Math.min(3, floorH), yTop, 0, -0.35, f.Um);
+    if (i < n) f.side(k.metal, t1, yb + Math.min(3, floorH), yTop, 0, -0.35, f.U);
+  }
+}
+
+/** Mur cortina: a cada planta una franja opaca i una franja de vidre enfonsada, amb muntants d'alumini cada 1,5 m. */
+function glassEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders, rgb: number[]): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const color = { [COLOR_ATTR]: rgb };
+  const DS = -0.06; // franja opaca
+  const DG = -0.2; // vidre
+  const spandrel = Math.min(1.0, floorH * 0.3);
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.plaster, yTop, 0.7, 0.25, color);
+  for (let fl = 0; fl < floors; fl++) {
+    const y0 = yb + fl * floorH;
+    const y1 = y0 + floorH;
+    // La planta baixa és més vidrada.
+    const ys = fl === 0 ? y0 + 0.15 : y0 + spandrel;
+    f.front(k.plaster, 0, L, y0, ys, DS, color);
+    f.flat(k.metal, 0, L, ys, DS, DG, true);
+    f.front(k.glass, 0, L, ys, y1, DG);
+    f.flat(k.metal, 0, L, y1, DS, DG, false);
+  }
+  const mullions = Math.max(1, Math.round(L / 1.5));
+  for (let i = 0; i <= mullions; i++) {
+    const t = (i * L) / mullions;
+    const t0 = Math.max(0, t - 0.05);
+    const t1 = Math.min(L, t + 0.05);
+    f.front(k.metal, t0, t1, yb, yTop, 0);
+    if (i > 0) f.side(k.metal, t0, yb, yTop, 0, DG, f.Um);
+    if (i < mullions) f.side(k.metal, t1, yb, yTop, 0, DG, f.U);
+  }
+}
+
+/** Paret d'arrebossat amb finestres retallades: brancals enfonsats i vidre al fons. */
+function punchedEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders, rgb: number[]): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const color = { [COLOR_ATTR]: rgb };
+  const reveal = { [COLOR_ATTR]: rgb.map((c) => c * 0.8) };
+  const DW = -0.25;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.plaster, yTop, 0.8, 0.3, color);
+  const bays = Math.max(1, Math.round(L / 3.0));
+  const w = L / bays;
+  if (w < 1.2) {
+    f.front(k.plaster, 0, L, yb, yTop, 0, color);
+    return;
+  }
+  for (let fl = 0; fl < floors; fl++) {
+    const y0 = yb + fl * floorH;
+    const y1 = y0 + floorH;
+    const wy0 = y0 + Math.min(0.9, floorH * 0.28);
+    const wy1 = y1 - Math.min(0.5, floorH * 0.15);
+    for (let i = 0; i < bays; i++) {
+      const t0 = i * w;
+      const t1 = t0 + w;
+      const ww = Math.min(1.4, w * 0.5);
+      const wx0 = t0 + (w - ww) / 2;
+      const wx1 = wx0 + ww;
+      f.front(k.plaster, t0, wx0, y0, y1, 0, color);
+      f.front(k.plaster, wx1, t1, y0, y1, 0, color);
+      f.front(k.plaster, wx0, wx1, y0, wy0, 0, color);
+      f.front(k.plaster, wx0, wx1, wy1, y1, 0, color);
+      f.side(k.plaster, wx0, wy0, wy1, 0, DW, f.U, reveal);
+      f.side(k.plaster, wx1, wy0, wy1, 0, DW, f.Um, reveal);
+      f.flat(k.concrete, wx0, wx1, wy0, 0, DW, true);
+      f.flat(k.plaster, wx0, wx1, wy1, 0, DW, false, reveal);
+      f.front(k.glass, wx0, wx1, wy0, wy1, DW);
+      // Travesser de la fusteria.
+      const mid = wy0 + (wy1 - wy0) * 0.62;
+      f.front(k.metal, wx0, wx1, mid - 0.03, mid + 0.03, DW + 0.03);
+    }
+  }
+}
+
+/**
+ * Façanes amb relleu per als edificis del campus que en tenen (vegeu `hasFacadeKit`).
+ * UV en metres (u al llarg de la façana, v amunt) per a textures en mosaic.
+ */
+export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMeshes {
+  const k: KitBuilders = {
+    brick: new MeshBuilder(),
+    concrete: new MeshBuilder(),
+    glass: new MeshBuilder(),
+    metal: new MeshBuilder(),
+    plaster: new MeshBuilder({ [COLOR_ATTR]: 3 }),
+    stone: new MeshBuilder(),
+  };
+  for (const b of buildings) {
+    if (!hasFacadeKit(b)) continue;
+    const rgb = hexToRgb(b.color);
+    // Tram més llarg del contorn: hi van els elements singulars (tall de la Biblioteca).
+    let mainEdge = 0;
+    let mainLen = 0;
+    b.footprint.forEach((a, i) => {
+      const c = b.footprint[(i + 1) % b.footprint.length];
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (len > mainLen) {
+        mainLen = len;
+        mainEdge = i;
+      }
+    });
+    for (const ring of [b.footprint, ...b.holes]) {
+      for (let e = 0; e < ring.length; e++) {
+        const a = ring[e];
+        const c = ring[(e + 1) % ring.length];
+        if (Math.hypot(c[0] - a[0], c[1] - a[1]) < 0.05) continue;
+        const f = new EdgeFrame(a, c, b.baseY);
+        if (b.facade === "campus") campusEdge(f, b, k);
+        else if (b.facade === "arcade") arcadeEdge(f, b, k);
+        else if (b.facade === "glass") glassEdge(f, b, k, rgb);
+        else if (b.facade === "brick") brickEdge(f, b, k);
+        else if (b.facade === "stone") stoneEdge(f, b, k, ring === b.footprint && e === mainEdge && b.label !== undefined);
+        else if (b.facade === "fins") finsEdge(f, b, k);
+        else punchedEdge(f, b, k, rgb);
+      }
+    }
+  }
+  return {
+    brick: k.brick.build(),
+    concrete: k.concrete.build(),
+    glass: k.glass.build(),
+    metal: k.metal.build(),
+    plaster: k.plaster.build(),
+    stone: k.stone.build(),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Col·lisió dels edificis amb porxo (fila A)
+
+/**
+ * Closca de col·lisió dels edificis `arcade`: la planta baixa dels trams llargs és oberta (pilars + paret del fons
+ * a la profunditat del porxo), de manera que es pot caminar sota el porxo. Coincideix amb el que dibuixa arcadeEdge.
+ */
+export function buildArcadeCollision(buildings: readonly BuildingData[]): MeshData {
+  const mb = new MeshBuilder();
+  const K = ARCADE_KIT;
+  for (const b of buildings) {
+    if (b.facade !== "arcade" || b.background) continue;
+    const floors = Math.max(1, b.levels);
+    const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+    const y1 = yb + b.height / floors;
+    const yTop = b.baseY + b.height;
+    const bottom = b.minHeight > 0 ? yb : b.footY;
+    for (const ring of [b.footprint, ...b.holes]) {
+      for (let e = 0; e < ring.length; e++) {
+        const a = ring[e];
+        const c = ring[(e + 1) % ring.length];
+        if (Math.hypot(c[0] - a[0], c[1] - a[1]) < 0.05) continue;
+        const f = new EdgeFrame(a, c, b.baseY);
+        const L = f.L;
+        if (L >= ARCADE_MIN_EDGE) {
+          const D = -K.portico;
+          f.front(mb, 0, L, y1, yTop, 0);
+          f.flat(mb, 0, L, y1, 0, D, false); // sostre del porxo
+          f.front(mb, 0, L, bottom, y1, D); // paret del fons
+          f.side(mb, 0, bottom, y1, 0, D, f.U);
+          f.side(mb, L, bottom, y1, 0, D, f.Um);
+          const n = Math.max(1, Math.round(L / K.pillarSpacing));
+          const hp = K.pillar / 2;
+          for (let i = 0; i <= n; i++) {
+            const t = (i * L) / n;
+            const t0 = Math.max(0, t - hp);
+            const t1 = Math.min(L, t + hp);
+            f.front(mb, t0, t1, bottom, y1, 0);
+            f.front(mb, t0, t1, bottom, y1, -K.pillar, {}, true);
+            if (i > 0) f.side(mb, t0, bottom, y1, 0, -K.pillar, f.Um);
+            if (i < n) f.side(mb, t1, bottom, y1, 0, -K.pillar, f.U);
+          }
+        } else {
+          f.front(mb, 0, L, bottom, yTop, 0);
+        }
+      }
+    }
+  }
+  return mb.build();
+}

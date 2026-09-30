@@ -22,6 +22,8 @@ export interface MapData {
   /** Polígon on es pot jugar (límit del campus). */
   playArea: Vec2[];
   terrain: TerrainData;
+  /** Ortofoto que cobreix exactament l'extensió del terreny (fila 0 = nord). */
+  orthophoto?: { file: string; width: number; height: number };
   buildings: BuildingData[];
   areas: AreaData[];
   paths: PathData[];
@@ -49,10 +51,15 @@ export type BuildingKind = "university" | "office" | "dormitory" | "sports" | "p
  *  - glass: franges de vidre (Omega, BSC, Biblioteca…)
  *  - punched: finestres retallades en paret massissa (habitatges, Nexus II…)
  *  - strips: finestres en franja (per defecte)
+ *  - arcade: fila A: porxo de pilars de formigó a la planta baixa, maó amb finestres retallades a sobre i cornisa
+ *  - brick: maó amb finestres retallades, vidrieres a la planta baixa i una franja vertical de vidre (B3, Telecos)
+ *  - stone: blocs massissos de pedra clara amb una franja de vidre fosc a la planta baixa (Biblioteca)
+ *  - fins: mur de vidre amb lamel·les verticals blanques molt juntes (BSC)
  */
-export type FacadeStyle = "strips" | "campus" | "glass" | "punched";
+export type FacadeStyle = "strips" | "campus" | "glass" | "punched" | "arcade" | "brick" | "stone" | "fins";
 
-export const FACADE_STYLES: readonly FacadeStyle[] = ["strips", "campus", "glass", "punched"];
+// L'ordre és l'índex que rep el shader (atribut facade.w): afegiu estils nous al final.
+export const FACADE_STYLES: readonly FacadeStyle[] = ["strips", "campus", "glass", "punched", "arcade", "brick", "stone", "fins"];
 
 export type EntranceKind = "main" | "secondary" | "service" | "other";
 
@@ -68,6 +75,8 @@ export interface BuildingData {
   name: string;
   /** Rètol gran pintat a la façana ("A5", "B6", "Ω"). */
   label?: string;
+  /** Rètol institucional en lletres de metall sobre l'entrada (façana principal, sobre la planta baixa). */
+  sign?: string;
   kind: BuildingKind;
   /** Anell exterior en sentit antihorari en el pla x-z (àrea amb signe positiva, vegeu geo.signedArea). */
   footprint: Vec2[];

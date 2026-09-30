@@ -20,3 +20,20 @@ export async function cachedFetchText(url: string, cacheFile: string, refresh: b
   await writeFile(cacheFile, text);
   return text;
 }
+
+/** Com `cachedFetchText` però per a fitxers binaris (imatges). Comprova el tipus de contingut. */
+export async function cachedFetchBinary(url: string, cacheFile: string, refresh: boolean, expectedType: string): Promise<Buffer> {
+  if (!refresh && existsSync(cacheFile)) {
+    return readFile(cacheFile);
+  }
+  console.log(`  ↓ ${url}`);
+  const res = await fetch(url, { headers: { "user-agent": USER_AGENT } });
+  const type = res.headers.get("content-type") ?? "";
+  if (!res.ok || !type.startsWith(expectedType)) {
+    throw new Error(`HTTP ${res.status} (${type}) a ${url}:\n${(await res.text()).slice(0, 300)}`);
+  }
+  const data = Buffer.from(await res.arrayBuffer());
+  await mkdir(dirname(cacheFile), { recursive: true });
+  await writeFile(cacheFile, data);
+  return data;
+}

@@ -4,6 +4,8 @@ import {
   MAP_FORMAT_VERSION,
   TerrainField,
   buildBuildingsMesh,
+  buildFacadeKits,
+  hasFacadeKit,
   buildTerrainMesh,
   buildWallsMesh,
 } from "@shutter/shared/map";
@@ -12,10 +14,13 @@ import { createLabels } from "./labels.ts";
 import { createFacadeMaterial, createTerrainMaterial } from "./materials.ts";
 import { toBufferGeometry } from "./meshes.ts";
 import { createProps } from "./props.ts";
+import { proceduralPbr } from "./textures.ts";
 
 export interface LoadedMap {
   map: MapData;
   terrain: TerrainField;
+  /** Ortofoto de l'ICGC que cobreix l'extensió del terreny (fila 0 = nord). */
+  ortho: ImageBitmap | null;
 }
 
 export async function loadMap(url: string): Promise<LoadedMap> {
@@ -23,30 +28,93 @@ export async function loadMap(url: string): Promise<LoadedMap> {
   if (!res.ok) throw new Error(`No s'ha pogut carregar el mapa (${res.status})`);
   const map = (await res.json()) as MapData;
   if (map.format !== MAP_FORMAT_VERSION) throw new Error(`Format de mapa ${map.format} no suportat`);
-  return { map, terrain: TerrainField.fromData(map.terrain) };
+  let ortho: ImageBitmap | null = null;
+  if (map.orthophoto) {
+    const img = await fetch(new URL(map.orthophoto.file, new URL(url, location.href)));
+    if (img.ok) ortho = await createImageBitmap(await img.blob());
+  }
+  return { map, terrain: TerrainField.fromData(map.terrain), ortho };
 }
 
 export interface World {
   group: THREE.Group;
-  groundCanvas: HTMLCanvasElement;
+  /** Imatge del terra vist des de dalt (serveix per al minimapa). */
+  groundImage: CanvasImageSource;
 }
 
-export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRenderer): World {
+function orthoTexture(image: ImageBitmap, renderer: THREE.WebGLRenderer): THREE.Texture {
+  const tex = new THREE.Texture(image);
+  tex.flipY = false; // fila 0 = z mínima = uv.v 0 (ImageBitmap no es gira)
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.WebGLRenderer): World {
   const group = new THREE.Group();
   group.name = "world";
 
-  const groundCanvas = bakeGround(map, terrain, 0.25);
-  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTexture(groundCanvas, renderer)));
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  // Textures procedurals (dibuixades per codi a textures.ts).
+  const bricks = proceduralPbr("facadeBrick", aniso);
+  const concreteTex = proceduralPbr("concrete", aniso);
+  const plaster = proceduralPbr("plaster", aniso);
+  const paverBrick = proceduralPbr("paverBrick", aniso);
+  const concretePaver = proceduralPbr("concretePaver", aniso);
+  const stone = proceduralPbr("stone", aniso);
+
+  // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
+  const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
+  const groundTex = ortho ? orthoTexture(ortho, renderer) : groundTexture(groundImage as HTMLCanvasElement, renderer);
+  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho, ortho ? { concrete: concretePaver, brick: paverBrick } : undefined));
   ground.name = "terrain";
   ground.receiveShadow = true;
   group.add(ground);
 
-  const { walls, roofs } = buildBuildingsMesh(map.buildings);
-  const facades = new THREE.Mesh(toBufferGeometry(walls), createFacadeMaterial());
+  // Terrats de tots els edificis; parets llises (amb finestres al shader) només dels que no tenen façana amb relleu.
+  const { roofs } = buildBuildingsMesh(map.buildings);
+  const { walls } = buildBuildingsMesh(map.buildings.filter((b) => !hasFacadeKit(b)));
+  const facadeMaterial = createFacadeMaterial();
+  Object.assign(facadeMaterial, plaster);
+  const facades = new THREE.Mesh(toBufferGeometry(walls), facadeMaterial);
   facades.name = "facades";
   facades.castShadow = true;
   facades.receiveShadow = true;
-  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+
+  // Façanes amb relleu: A–D (formigó, maó, lamel·les), mur cortina i finestres retallades.
+  const kit = buildFacadeKits(map.buildings);
+  const kitMaterials = {
+    // Tint una mica més vermell i fosc: de lluny el mosaic es veia massa taronja (foto real de B3).
+    brick: new THREE.MeshStandardMaterial({ ...bricks, roughness: 1 }),
+    concrete: new THREE.MeshStandardMaterial({ ...concreteTex, roughness: 1 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x1c252e, roughness: 0.06, metalness: 0.3, envMapIntensity: 1.4 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xcfd1cf, roughness: 0.45, metalness: 0.4 }),
+    plaster: new THREE.MeshStandardMaterial({ ...plaster, vertexColors: true, roughness: 1 }),
+    stone: new THREE.MeshStandardMaterial({ ...stone, roughness: 1 }),
+  };
+  for (const key of ["brick", "concrete", "glass", "metal", "plaster", "stone"] as const) {
+    const mesh = new THREE.Mesh(toBufferGeometry(kit[key]), kitMaterials[key]);
+    mesh.name = `kit-${key}`;
+    // Només les superfícies exteriors projecten ombra; el maó, el vidre i el metall són enfonsats i en fan poca.
+    mesh.castShadow = key === "concrete" || key === "plaster" || key === "stone" || key === "brick";
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+  const roofMaterial = new THREE.MeshStandardMaterial({ vertexColors: !ortho, roughness: 0.95 });
+  if (ortho) {
+    // Els terrats tenen uv = (x, z) en metres: es projecta l'ortofoto des de dalt.
+    const width = (terrain.cols - 1) * terrain.cellSize;
+    const depth = (terrain.rows - 1) * terrain.cellSize;
+    const roofTex = groundTex.clone();
+    roofTex.repeat.set(1 / width, 1 / depth);
+    roofTex.offset.set(-terrain.originX / width, -terrain.originZ / depth);
+    roofTex.needsUpdate = true;
+    roofMaterial.map = roofTex;
+    roofMaterial.color.setScalar(0.62); // la foto ja porta la llum del sol
+  }
+  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), roofMaterial);
   roofMesh.name = "roofs";
   roofMesh.castShadow = true;
   roofMesh.receiveShadow = true;
@@ -64,5 +132,5 @@ export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRe
   group.add(createProps(map.props, terrain));
   group.add(createLabels(map.buildings));
 
-  return { group, groundCanvas };
+  return { group, groundImage };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBuildingsMesh, buildTerrainMesh, buildWallsMesh, type MeshData } from "./geometry.ts";
+import { buildBuildingsMesh, buildFacadeKits, buildTerrainMesh, buildWallsMesh, type MeshData } from "./geometry.ts";
 import { TerrainField } from "./terrain.ts";
 import type { BuildingData, WallData } from "./types.ts";
 
@@ -91,5 +91,27 @@ describe("geometria del mapa", () => {
       { kind: "planter", points: [[1, 1], [3, 1], [3, 3], [1, 3]], height: 0.5, thickness: 0.3, closed: true },
     ];
     expectWindingMatchesNormals(buildWallsMesh(walls, flat(12, 12)));
+  });
+
+  it("els kits de façana tenen les cares ben orientades i no surten del contorn", () => {
+    // Rectangle 30 × 12 m en ordre positiu, 3 plantes.
+    const fp: [number, number][] = [[0, 0], [0, -12], [30, -12], [30, 0]];
+    for (const facade of ["campus", "glass", "punched", "arcade", "brick", "stone", "fins"] as const) {
+      const kit = buildFacadeKits([building(fp, { facade, levels: 3, height: 11.4, label: "X" })]); // amb rètol: façana principal (tall de la Biblioteca)
+      for (const mesh of [kit.brick, kit.concrete, kit.glass, kit.metal, kit.plaster, kit.stone]) {
+        if (mesh.indices.length) expectWindingMatchesNormals(mesh);
+        // Res no sobresurt del pla de la façana (la col·lisió és la closca exterior).
+        const p = mesh.positions;
+        for (let i = 0; i < p.length; i += 3) {
+          expect(p[i]).toBeGreaterThanOrEqual(-1e-6);
+          expect(p[i]).toBeLessThanOrEqual(30 + 1e-6);
+          expect(p[i + 2]).toBeLessThanOrEqual(1e-6);
+          expect(p[i + 2]).toBeGreaterThanOrEqual(-12 - 1e-6);
+        }
+      }
+      expect(kit.glass.indices.length, facade).toBeGreaterThan(0);
+    }
+    const campus = buildFacadeKits([building(fp, { facade: "campus", levels: 3, height: 11.4 })]);
+    expect(campus.glass.indices.length / 6).toBe(3 * 2 * 8 + 3 * 2 * 3); // 8 crugies als costats llargs, 3 als curts
   });
 });

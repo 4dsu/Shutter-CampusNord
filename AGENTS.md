@@ -50,6 +50,11 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 | `apps/server/src/` | Servidor HTTP + WebSocket (`index.ts`), fitxers estàtics (`static.ts`) |
 | `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `projection.ts` |
 | `assets/maps/campus-nord.json` | Mapa generat. **No l'editis a mà**: canvia l'importador o `overrides.ts` i torna a executar-lo |
+| `assets/maps/campus-nord-orto.jpg`, `campus-nord-reference.json` | Ortofoto de l'ICGC (terra i terrats) i parts del Cadastre per a l'editor (`?mode=editor`) |
+| `apps/client/src/render/textures.ts` | Textures **procedurals** (maó de façana, llambordes, formigó, arrebossat, pedra) dibuixades per codi en canvas |
+| `tools/map-import/src/mapillary.ts` | Informe de cobertura de fotos de Mapillary per edifici (només **referència**; cal `MAPILLARY_TOKEN` a `.env.local`) |
+| `tools/map-import/src/catastro*.ts`, `orthophoto.ts` | Descàrrega del Cadastre i de l'ortofoto; fusió dels edificis OSM amb el Cadastre |
+| `docs/FOTOS.md` | Llista de fotos del campus que es necessiten (i on pujar-les) |
 
 ## 4. Convencions obligatòries
 
@@ -78,6 +83,10 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 
 - **El que es veu i el que col·lisiona surten de les mateixes funcions** (`buildTerrainMesh`, `buildBuildingsMesh`, `buildWallsMesh`).
   No facis una col·lisió "a part" que pugui divergir del render.
+- **Excepció: el relleu decoratiu** (`buildCampusFacades`) és només de render.
+  - No pot sobresortir del pla de la closca de col·lisió: tot va cap endins, i un test ho comprova.
+  - La closca de parets d'aquests edificis serveix per a les col·lisions, però no es dibuixa.
+  - Excepció dins l'excepció: els edificis `arcade` (fila A) fan servir `buildArcadeCollision`, que reprodueix el porxo (pilars + paret del fons) perquè s'hi pugui caminar. Si canvies `arcadeEdge`, canvia també la col·lisió.
 - Totes les cares miren cap a fora (ordre antihorari vist des de fora). Hi ha tests que ho comproven: afegeix-n'hi si crees geometria nova.
 
 ### Render (client)
@@ -91,6 +100,18 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 
 - Imita el codi del voltant: comentaris breus en català que expliquen el *perquè*, funcions petites i sense abstraccions prematures.
 - Cap dependència nova sense motiu clar. Si n'afegeixes una, explica al PR per què.
+
+### Correccions del mapa
+
+- Les correccions manuals viuen a `tools/map-import/corrections.json` (tipus `MapCorrections` a `packages/shared/src/map/corrections.ts`):
+  - canvis d'edificis per id: contorn, plantes, alçada, alçada inicial (porxos) i estil de façana; o `remove: true`;
+  - edificis nous (`added`);
+  - places i terrasses planes (`platforms`), amb una alçada en m sobre el mar.
+- L'importador les aplica per sobre d'OSM i del Cadastre.
+- Maneres de fer-les:
+  - **Amb l'editor** (`?mode=editor`, amb `npm run dev` en marxa): **Desa i regenera** escriu el fitxer i torna a executar l'importador a través del servidor de desenvolupament (`PUT /dev/corrections`, només amb `--dev` i des de localhost).
+  - **A mà:** edita el JSON i executa `npm run map:import`.
+- Fes commit de `corrections.json` **i** dels fitxers regenerats de `assets/maps/` en el mateix commit.
 
 ### Proves al navegador
 
@@ -135,6 +156,17 @@ Hi treballen diverses persones, cadascuna amb el seu agent. Per no barrejar fein
   - Respecta la política d'ús: l'importador guarda les descàrregues a `tools/map-import/.cache/` (ignorada per git).
   - Fes servir `--refresh` només quan calgui.
 - **Edificis sense nom a OSM:** A4, A5, A6, B3 i B6 no tenen nom i s'identifiquen per id de via a `tools/map-import/src/overrides.ts`.
+- **Font de cada edifici del campus:**
+  - Geometria i plantes: si hi ha parts del Cadastre, surten d'allà (`catastroMerge.ts`).
+  - Nom, rètol, estil i interior: d'OSM i `overrides.ts`.
+  - Si el Cadastre diu 0 plantes sobre rasant, l'edifici és soterrat i no es dibuixa.
+- **Textures i façanes:** es fan per codi. Les fotos (Mapillary, pròpies) serveixen només de referència per a colors, mides i aparells: no es fan servir mai com a textura.
+  - Excepció: l'ortofoto de l'ICGC per al terra de lluny i els terrats.
+  - Mides de referència (fotos de Mapillary, 2025):
+    - Fila A: porxo de pilars de formigó a la planta baixa i maó amb finestres retallades a sobre (estil `arcade`).
+    - B4: renovat amb plafons clars.
+    - Passeigs: llambordes de maó vermell fosc. Eix central: llambordes grises.
+- **Ortofoto:** és una foto real, així que ja porta ombres i llum. Els materials que la fan servir s'enfosqueixen (×0,62) perquè no quedi il·luminada dues vegades.
 - **Parts d'edificis:** un edifici amb `building:part` es divideix en volums (`A5-p0`, `A5-p1`…). L'interior i el rètol van a la part més gran.
 - **Dades ODbL:** qualsevol canvi a `assets/maps/` ha de mantenir l'atribució (`map.attribution`, `assets/maps/LICENSE.md`).
 - **Node:** el servidor s'executa amb `node --watch src/index.ts`, no amb `tsx`. Si Node es queixa de sintaxi, segurament has fet servir sintaxi no esborrable.

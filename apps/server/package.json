@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.ts",
+    "dev": "node --watch src/index.ts --port 3000 --dev",
     "start": "node src/index.ts"
   },
   "dependencies": {

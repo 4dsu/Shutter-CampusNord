@@ -9,6 +9,7 @@ export interface BuildingOverride {
   id?: string;
   name?: string;
   label?: string;
+  sign?: string;
   kind?: BuildingKind;
   levels?: number;
   height?: number;
@@ -20,18 +21,26 @@ export interface BuildingOverride {
 
 export const BUILDING_OVERRIDES: Record<number, BuildingOverride> = {
   // Fila A (aularis, 5 plantes)
-  183542827: { id: "A1" },
-  187765241: { id: "A2" },
-  187765243: { id: "A3" },
-  187765244: { id: "A4", name: "A4" },
-  187765249: { id: "A5", name: "A5", interior: "A5" },
-  187765253: { id: "A6", name: "A6", interior: "A6" },
+  183542827: { id: "A1", facade: "arcade" },
+  187765241: { id: "A2", facade: "arcade" },
+  187765243: { id: "A3", facade: "arcade" },
+  187765244: { id: "A4", name: "A4", facade: "arcade" },
+  187765249: { id: "A5", name: "A5", facade: "arcade", interior: "A5" },
+  187765253: { id: "A6", name: "A6", facade: "arcade", interior: "A6" },
   // Fila B
   595330170: { id: "B0" },
   642719986: { id: "B1" },
   642719985: { id: "B2" },
-  1124652469: { id: "B3", name: "B3 · ETSETB (Telecos)", label: "B3" },
-  642719995: { id: "B4" },
+  1124652469: {
+    id: "B3",
+    name: "B3 · ETSETB (Telecos)",
+    label: "B3",
+    sign: "Escola Tècnica Superior d'Enginyeria de Telecomunicació de Barcelona",
+    facade: "brick",
+    color: "#b0583b",
+  },
+  // B4 està renovat: plafons clars amb finestres verticals (foto de referència).
+  642719995: { id: "B4", facade: "punched", color: "#e2ded5" },
   1124652470: { id: "B5" },
   642719991: { id: "B6", name: "B6 · FIB", label: "B6" },
   // Fila C
@@ -55,12 +64,12 @@ export const BUILDING_OVERRIDES: Record<number, BuildingOverride> = {
   1436110226: { id: "pavello-a1a2", facade: "glass", color: "#dcd9d2" },
   // Altres edificis del campus (colors a partir de fotografies)
   642719972: { id: "omega", label: "Ω", facade: "glass", color: "#e4ded2" },
-  642719966: { id: "nexus2", name: "Nexus II", label: "NEXUS II", facade: "punched", color: "#c98b6f" },
+  642719966: { id: "nexus2", name: "Nexus II", label: "NEXUS II", facade: "glass", color: "#d9dcdc" },
   18116538: { id: "nexus1", facade: "punched", color: "#d6cbb8" },
-  642719980: { id: "biblioteca", label: "BIBLIOTECA", facade: "glass", color: "#d8d2c4", interior: "biblioteca" },
+  642719980: { id: "biblioteca", label: "BIBLIOTECA", facade: "stone", color: "#d8cfbd", interior: "biblioteca" },
   187660313: { id: "poliesportiu", kind: "sports", levels: 2, height: 9, color: "#c9c3b6" },
   642719955: { id: "capella", label: "CAPELLA", facade: "punched", color: "#d9bf9f", roofColor: "#a86e52" },
-  593611153: { id: "bsc", name: "BSC-Repsol", facade: "glass", color: "#eef0f1" },
+  593611153: { id: "bsc", name: "BSC-Repsol", facade: "fins", color: "#eef0f1" },
   642719945: { id: "tillers", facade: "punched", color: "#cfc6b5" },
   1444137905: { id: "residencia", facade: "punched", color: "#b87a5c" },
 };

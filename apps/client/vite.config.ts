@@ -6,8 +6,11 @@ export default defineConfig({
   publicDir: fileURLToPath(new URL("../../assets", import.meta.url)),
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       "/ws": { target: "ws://localhost:3000", ws: true },
+      // Eines de l'editor del mapa (només en desenvolupament).
+      "/dev": { target: "http://localhost:3000" },
     },
   },
   build: {

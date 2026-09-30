@@ -6,3 +6,6 @@ dist/
 coverage/
 # Dades en brut descarregades per l'importador del mapa (es regeneren amb npm run map:import)
 tools/map-import/.cache/
+
+# Secrets locals (tokens d'API)
+.env.local

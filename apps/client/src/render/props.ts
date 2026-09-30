@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { PropData, PropKind, TerrainField } from "@shutter/shared/map";
+import { type TreeKind, createTrees } from "./trees.ts";
+
+const TREE_KINDS: readonly PropKind[] = ["tree", "conifer", "palm", "shrub"] satisfies TreeKind[];
 
 /** Peça low-poly: geometria + color + transformació local. */
 function part(geom: THREE.BufferGeometry, color: string, pos: [number, number, number] = [0, 0, 0], rot: [number, number, number] = [0, 0, 0], scale: [number, number, number] = [1, 1, 1]): THREE.BufferGeometry {
@@ -32,30 +35,6 @@ const cyl = (rt: number, rb: number, h: number, seg = 6) => new THREE.CylinderGe
 function propGeometry(kind: PropKind): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   switch (kind) {
-    case "tree":
-      parts.push(part(cyl(0.16, 0.24, 4.2), "#6b4f3a", [0, 2.1, 0]));
-      parts.push(part(new THREE.IcosahedronGeometry(2.9, 0), "#5e8c3d", [0, 6.2, 0], [0.3, 0.2, 0], [1, 0.85, 1]));
-      parts.push(part(new THREE.IcosahedronGeometry(2.1, 0), "#6c9a45", [1.3, 7.3, 0.6], [0.8, 0.4, 0.1]));
-      parts.push(part(new THREE.IcosahedronGeometry(1.9, 0), "#577f39", [-1.2, 7.0, -0.8], [0.1, 1.1, 0.5]));
-      break;
-    case "conifer":
-      parts.push(part(cyl(0.14, 0.2, 2.4), "#5f4632", [0, 1.2, 0]));
-      parts.push(part(new THREE.ConeGeometry(2.0, 5.2, 7), "#3f6b3a", [0, 4.3, 0]));
-      parts.push(part(new THREE.ConeGeometry(1.5, 3.8, 7), "#467541", [0, 6.8, 0]));
-      break;
-    case "palm": {
-      parts.push(part(cyl(0.17, 0.26, 8.2, 7), "#8a7356", [0, 4.1, 0]));
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * Math.PI * 2;
-        parts.push(
-          part(box(0.5, 0.06, 3.2), "#5d8b3b", [Math.sin(a) * 1.4, 8.0, Math.cos(a) * 1.4], [-0.45, a, 0], [1, 1, 1]),
-        );
-      }
-      break;
-    }
-    case "shrub":
-      parts.push(part(new THREE.IcosahedronGeometry(0.85, 0), "#557f3a", [0, 0.6, 0], [0.2, 0.5, 0], [1.2, 0.8, 1]));
-      break;
     case "lamp":
       // Fanal de campus: pal alt amb globus blanc.
       parts.push(part(cyl(0.06, 0.1, 4.4), "#4a4f55", [0, 2.2, 0]));
@@ -102,8 +81,11 @@ function propGeometry(kind: PropKind): THREE.BufferGeometry {
 export function createProps(props: readonly PropData[], terrain: TerrainField): THREE.Group {
   const group = new THREE.Group();
   group.name = "props";
+  // La vegetació té el seu propi mòdul (copes arrodonides, variants i material de fulles).
+  group.add(createTrees(props, terrain));
   const byKind = new Map<PropKind, PropData[]>();
   for (const p of props) {
+    if (TREE_KINDS.includes(p.kind)) continue;
     if (!byKind.has(p.kind)) byKind.set(p.kind, []);
     byKind.get(p.kind)!.push(p);
   }
