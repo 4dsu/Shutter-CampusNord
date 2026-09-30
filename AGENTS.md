@@ -86,6 +86,7 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 - **Excepció: el relleu decoratiu** (`buildCampusFacades`) és només de render.
   - No pot sobresortir del pla de la closca de col·lisió: tot va cap endins, i un test ho comprova.
   - La closca de parets d'aquests edificis serveix per a les col·lisions, però no es dibuixa.
+  - Excepció dins l'excepció: els edificis `arcade` (fila A) fan servir `buildArcadeCollision`, que reprodueix el porxo (pilars + paret del fons) perquè s'hi pugui caminar. Si canvies `arcadeEdge`, canvia també la col·lisió.
 - Totes les cares miren cap a fora (ordre antihorari vist des de fora). Hi ha tests que ho comproven: afegeix-n'hi si crees geometria nova.
 
 ### Render (client)

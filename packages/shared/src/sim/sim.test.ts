@@ -225,3 +225,34 @@ describe("impactes", () => {
     expect(res.worldHit?.surface).toBe("building");
   });
 });
+
+describe("porxo de la fila A", () => {
+  it("es pot caminar sota el porxo però no travessar la paret del fons", () => {
+    const b = map.buildings.find((x) => x.id === "A4")!;
+    const depths: number[] = [];
+    b.footprint.forEach((a, i) => {
+      const c = b.footprint[(i + 1) % b.footprint.length];
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (len < 8) return;
+      const ux = (c[0] - a[0]) / len;
+      const uz = (c[1] - a[1]) / len;
+      const nx = uz;
+      const nz = -ux;
+      // A mig camí entre dos pilars, 4 m fora de la façana, caminant cap a l'edifici.
+      const n = Math.max(1, Math.round(len / 5.4));
+      const t = (len / n) * (Math.floor(n / 2) + 0.5);
+      const sx = a[0] + ux * t + nx * 4;
+      const sz = a[1] + uz * t + nz * 4;
+      const yaw = Math.atan2(nx, nz);
+      const body = new PlayerBody(physics);
+      const s = createPlayerState(sx, terrain.heightAt(sx, sz) + 0.3, sz, yaw);
+      simulate(body, s, 180, () => input(Buttons.Forward, yaw));
+      body.dispose();
+      // Distància signada al pla de la façana: negativa = sota el porxo.
+      depths.push((s.x - a[0]) * nx + (s.z - a[1]) * nz);
+    });
+    // Algun tram és accessible (d'altres poden tenir murs o bancs davant) i cap no deixa travessar la paret del fons.
+    expect(Math.min(...depths)).toBeLessThan(-1.5);
+    for (const d of depths) expect(d).toBeGreaterThan(-3 - 0.1);
+  });
+});

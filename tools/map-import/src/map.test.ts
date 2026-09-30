@@ -21,7 +21,8 @@ describe("mapa del Campus Nord", () => {
     const grid = map.buildings.filter((b) => /^[A-D]\d/.test(b.id));
     expect(grid.every((b) => !b.background)).toBe(true);
     // Fila A: porxo; B4 està renovat; la resta, maó i formigó (vegeu overrides.ts).
-    const expected = (id: string) => (id.startsWith("A") ? "arcade" : id.startsWith("B4") ? "punched" : "campus");
+    const expected = (id: string) =>
+      id.startsWith("A") ? "arcade" : id.startsWith("B4") ? "punched" : id.startsWith("B3") ? "brick" : "campus";
     for (const b of grid) expect(b.facade, b.id).toBe(expected(b.id));
   });
 

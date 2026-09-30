@@ -63,6 +63,7 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   const plaster = proceduralPbr("plaster", aniso);
   const paverBrick = proceduralPbr("paverBrick", aniso);
   const concretePaver = proceduralPbr("concretePaver", aniso);
+  const stone = proceduralPbr("stone", aniso);
 
   // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
   const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
@@ -91,12 +92,13 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
     glass: new THREE.MeshStandardMaterial({ color: 0x1c252e, roughness: 0.06, metalness: 0.3, envMapIntensity: 1.4 }),
     metal: new THREE.MeshStandardMaterial({ color: 0xcfd1cf, roughness: 0.45, metalness: 0.4 }),
     plaster: new THREE.MeshStandardMaterial({ ...plaster, vertexColors: true, roughness: 1 }),
+    stone: new THREE.MeshStandardMaterial({ ...stone, roughness: 1 }),
   };
-  for (const key of ["brick", "concrete", "glass", "metal", "plaster"] as const) {
+  for (const key of ["brick", "concrete", "glass", "metal", "plaster", "stone"] as const) {
     const mesh = new THREE.Mesh(toBufferGeometry(kit[key]), kitMaterials[key]);
     mesh.name = `kit-${key}`;
     // Només les superfícies exteriors projecten ombra; el maó, el vidre i el metall són enfonsats i en fan poca.
-    mesh.castShadow = key === "concrete" || key === "plaster";
+    mesh.castShadow = key === "concrete" || key === "plaster" || key === "stone" || key === "brick";
     mesh.receiveShadow = true;
     group.add(mesh);
   }

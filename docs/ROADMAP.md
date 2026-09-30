@@ -34,8 +34,9 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [ ] Editor: escales i murs de contenció
 - [x] Kits per als altres estils (mur cortina de vidre per a Omega/BSC, finestres retallades amb relleu)
 - [x] Textures procedurals pròpies (sense imatges externes) i kit `arcade` de la fila A a partir de fotos de referència de Mapillary
-- [ ] Porxo de la fila A caminable (ara la col·lisió és la closca exterior)
-- [ ] Revisar amb fotos de referència: B3 (vidrieres i rètol), Biblioteca (façana inclinada), Nexus II, BSC
+- [x] Porxo de la fila A caminable (`buildArcadeCollision`, amb test)
+- [x] Estils nous a partir de fotos de referència: B3 `brick` (franja vertical de vidre, vidrieres, lamel·les), Biblioteca `stone`, Nexus II mur cortina, BSC `fins` (lamel·les verticals)
+- [ ] Biblioteca: façana inclinada i gran obertura en diagonal; rètol de Telecos a B3
 - [ ] Edificis singulars a partir de fotos (`docs/FOTOS.md`)
 - [ ] Terrasses i murs de contenció amb desnivell sec; escales amb graons
 - [ ] Render: ombres en cascada, SSAO, arbres segons espècie, opció de qualitat baixa

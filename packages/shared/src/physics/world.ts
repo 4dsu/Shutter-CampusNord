@@ -1,5 +1,5 @@
 import type RAPIER_NS from "@dimforge/rapier3d-compat";
-import { buildBuildingsMesh, buildTerrainMesh, buildWallsMesh, mergeForCollision } from "../map/geometry.ts";
+import { buildArcadeCollision, buildBuildingsMesh, buildTerrainMesh, buildWallsMesh, mergeForCollision } from "../map/geometry.ts";
 import type { TerrainField } from "../map/terrain.ts";
 import type { MapData, Vec2 } from "../map/types.ts";
 import type { Vec3 } from "../math.ts";
@@ -51,8 +51,10 @@ export class PhysicsWorld {
   private build(map: MapData, terrain: TerrainField): void {
     const R = this.rapier;
     this.addTrimesh(mergeForCollision([buildTerrainMesh(terrain)]), "terrain");
-    const { walls, roofs } = buildBuildingsMesh(map.buildings);
-    this.addTrimesh(mergeForCollision([walls, roofs]), "building");
+    // Els edificis amb porxo tenen la seva pròpia closca (es pot caminar sota el porxo); la resta, la closca exterior.
+    const { roofs } = buildBuildingsMesh(map.buildings);
+    const { walls } = buildBuildingsMesh(map.buildings.filter((b) => b.facade !== "arcade" || b.background));
+    this.addTrimesh(mergeForCollision([walls, roofs, buildArcadeCollision(map.buildings)]), "building");
     this.addTrimesh(mergeForCollision([buildWallsMesh(map.walls, terrain)]), "wall");
     this.addTrimesh(boundaryMesh(map.playArea, terrain), "boundary");
 

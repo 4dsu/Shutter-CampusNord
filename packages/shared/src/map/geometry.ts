@@ -424,6 +424,8 @@ export interface FacadeKitMeshes {
   metal: MeshData;
   /** Arrebossat amb el color de cada edifici (atribut `color`, sRGB). */
   plaster: MeshData;
+  /** Plaques de pedra clara (Biblioteca). */
+  stone: MeshData;
 }
 
 /** Mides del kit A–D (m). La graella de formigó queda a ras del contorn; el maó i les finestres, enfonsats. */
@@ -439,7 +441,7 @@ export const CAMPUS_KIT = {
 
 /** Quins edificis tenen façana amb relleu (la resta es dibuixen amb la closca i el patró del shader). */
 export function hasFacadeKit(b: BuildingData): boolean {
-  return !b.background && (b.facade === "campus" || b.facade === "glass" || b.facade === "punched" || b.facade === "arcade");
+  return !b.background && b.facade !== "strips";
 }
 
 interface KitBuilders {
@@ -448,6 +450,7 @@ interface KitBuilders {
   glass: MeshBuilder;
   metal: MeshBuilder;
   plaster: MeshBuilder;
+  stone: MeshBuilder;
 }
 
 /** Edificis A–D: pilars i forjats de formigó, plafons de maó i una finestra vertical amb lamel·les per crugia. */
@@ -513,6 +516,9 @@ function campusEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
   }
 }
 
+/** Trams més curts que això no tenen porxo. */
+export const ARCADE_MIN_EDGE = 8;
+
 /** Mides del kit de la fila A (m), a partir de fotos del campus (Mapillary, 2025). */
 export const ARCADE_KIT = {
   pillarSpacing: 5.4,
@@ -528,7 +534,7 @@ export const ARCADE_KIT = {
 /**
  * Fila A: porxo a la planta baixa (pilars quadrats de formigó a ras del contorn, sostre i paret vidrada enfonsats),
  * plantes de maó amb finestres retallades i una cornisa de formigó a dalt.
- * Nota: la col·lisió és la closca exterior, així que encara no es pot caminar sota el porxo.
+ * La col·lisió (buildArcadeCollision) segueix la mateixa forma: es pot caminar sota el porxo.
  */
 function arcadeEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
   const K = ARCADE_KIT;
@@ -538,30 +544,32 @@ function arcadeEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
   const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
   const yTop = b.baseY + b.height;
   const y1 = yb + floorH; // sostre del porxo
-  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  // Sòcol només als trams sense porxo: sota el porxo s'hi camina.
+  if (L < ARCADE_MIN_EDGE && b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
   f.parapet(k.concrete, yTop, 0.6, 0.3);
 
   // Planta baixa: porxo als trams llargs, maó massís als curts.
-  if (L >= 8) {
+  if (L >= ARCADE_MIN_EDGE) {
     const D = -K.portico;
     const n = Math.max(1, Math.round(L / K.pillarSpacing));
     const hp = K.pillar / 2;
-    // Paret del fons: sòcol de maó i vidre.
-    f.front(k.brick, 0, L, yb, yb + 0.6, D);
+    // Paret del fons: sòcol de maó (fins al terreny, que pot quedar per sota de la planta baixa) i vidre.
+    const bottom = b.minHeight > 0 ? yb : b.footY;
+    f.front(k.brick, 0, L, bottom, yb + 0.6, D);
     f.front(k.glass, 0, L, yb + 0.6, y1 - 0.4, D);
     f.front(k.concrete, 0, L, y1 - 0.4, y1, D);
     // Sostre del porxo i caps dels extrems.
     f.flat(k.concrete, 0, L, y1, 0, D, false);
-    f.side(k.concrete, 0, yb, y1, 0, D, f.U);
-    f.side(k.concrete, L, yb, y1, 0, D, f.Um);
+    f.side(k.concrete, 0, bottom, y1, 0, D, f.U);
+    f.side(k.concrete, L, bottom, y1, 0, D, f.Um);
     for (let i = 0; i <= n; i++) {
       const t = (i * L) / n;
       const t0 = Math.max(0, t - hp);
       const t1 = Math.min(L, t + hp);
-      f.front(k.concrete, t0, t1, yb, y1, 0);
-      f.front(k.concrete, t0, t1, yb, y1, -K.pillar, {}, true);
-      if (i > 0) f.side(k.concrete, t0, yb, y1, 0, -K.pillar, f.Um);
-      if (i < n) f.side(k.concrete, t1, yb, y1, 0, -K.pillar, f.U);
+      f.front(k.concrete, t0, t1, bottom, y1, 0);
+      f.front(k.concrete, t0, t1, bottom, y1, -K.pillar, {}, true);
+      if (i > 0) f.side(k.concrete, t0, bottom, y1, 0, -K.pillar, f.Um);
+      if (i < n) f.side(k.concrete, t1, bottom, y1, 0, -K.pillar, f.U);
     }
   } else {
     f.front(k.brick, 0, L, yb, y1, 0);
@@ -602,6 +610,132 @@ function arcadeEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
       f.front(k.metal, wx0, wx1, wy1 - 0.06, wy1, D + 0.02);
       f.front(k.metal, wx0, wx1, wy0 + (wy1 - wy0) * 0.35, wy0 + (wy1 - wy0) * 0.35 + 0.05, D + 0.02);
     }
+  }
+}
+
+/**
+ * B3 (Telecos): maó amb finestres retallades, vidrieres a la planta baixa i una franja vertical de vidre al centre
+ * dels trams llargs (escala), amb plafons de lamel·les horitzontals a les plantes altes.
+ */
+function brickEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.brick, yTop, 0.8, 0.3);
+  const D = -0.3;
+  // Franja vertical de vidre (només als trams llargs).
+  const band = L >= 14 ? { t0: L / 2 - 1.6, t1: L / 2 + 1.6 } : null;
+  const n = Math.max(1, Math.round(L / 2.8));
+  const w = L / n;
+  for (let fl = 0; fl < floors; fl++) {
+    const y0 = yb + fl * floorH;
+    const y1 = y0 + floorH;
+    const inBand = (t0: number, t1: number): boolean => !!band && t1 > band.t0 && t0 < band.t1;
+    for (let i = 0; i < n; i++) {
+      const t0 = i * w;
+      const t1 = t0 + w;
+      if (inBand(t0, t1)) continue;
+      // Planta baixa: vidrieres grans; plantes altes: finestres retallades (una de cada tres, plafó de lamel·les).
+      const ww = fl === 0 ? w * 0.7 : Math.min(1.1, w * 0.42);
+      const wx0 = t0 + (w - ww) / 2;
+      const wx1 = wx0 + ww;
+      const wy0 = fl === 0 ? y0 + 0.25 : y0 + Math.min(0.9, floorH * 0.28);
+      const wy1 = y1 - Math.min(0.45, floorH * 0.14);
+      f.front(k.brick, t0, wx0, y0, y1, 0);
+      f.front(k.brick, wx1, t1, y0, y1, 0);
+      f.front(k.brick, wx0, wx1, y0, wy0, 0);
+      f.front(k.brick, wx0, wx1, wy1, y1, 0);
+      f.side(k.brick, wx0, wy0, wy1, 0, D, f.U);
+      f.side(k.brick, wx1, wy0, wy1, 0, D, f.Um);
+      f.flat(k.concrete, wx0, wx1, wy0, 0, D, true);
+      f.flat(k.brick, wx0, wx1, wy1, 0, D, false);
+      f.front(k.glass, wx0, wx1, wy0, wy1, D);
+      if (fl > 0 && i % 3 === 1) {
+        const slats = 8;
+        const sh = (wy1 - wy0) / slats;
+        for (let s = 0; s < slats; s++) f.front(k.metal, wx0 + 0.02, wx1 - 0.02, wy0 + s * sh, wy0 + s * sh + sh * 0.55, D + 0.12);
+      }
+    }
+  }
+  if (band) {
+    // Franja de vidre de dalt a baix, amb muntants i el forjat de cada planta marcat.
+    f.front(k.glass, band.t0, band.t1, yb, yTop, -0.25);
+    f.side(k.brick, band.t0, yb, yTop, 0, -0.25, f.Um);
+    f.side(k.brick, band.t1, yb, yTop, 0, -0.25, f.U);
+    // Omple els trossos de maó entre la franja i les crugies veïnes.
+    const i0 = Math.floor(band.t0 / w);
+    const i1 = Math.min(n - 1, Math.floor(band.t1 / w));
+    if (band.t0 > i0 * w) f.front(k.brick, i0 * w, band.t0, yb, yTop, 0);
+    if (band.t1 < (i1 + 1) * w) f.front(k.brick, band.t1, (i1 + 1) * w, yb, yTop, 0);
+    for (let m = 0; m <= 3; m++) {
+      const t = band.t0 + ((band.t1 - band.t0) * m) / 3;
+      f.front(k.metal, Math.max(band.t0, t - 0.04), Math.min(band.t1, t + 0.04), yb, yTop, -0.22);
+    }
+    for (let fl = 1; fl < floors; fl++) {
+      const y = yb + fl * floorH;
+      f.front(k.metal, band.t0, band.t1, y - 0.12, y + 0.12, -0.22);
+    }
+  }
+}
+
+/** Biblioteca: plaques massisses de pedra clara, sense finestres a dalt, i una franja de vidre fosc a la planta baixa. */
+function stoneEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const L = f.L;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.stone, 0, L, b.footY, yb, 0);
+  const glassTop = yb + Math.min(4.2, b.height * 0.3);
+  const D = -0.5;
+  if (L >= 6) {
+    // Planta baixa vidrada i enfonsada sota la massa de pedra.
+    f.front(k.glass, 0, L, yb, glassTop, D);
+    f.flat(k.stone, 0, L, glassTop, 0, D, false);
+    f.side(k.stone, 0, yb, glassTop, 0, D, f.U);
+    f.side(k.stone, L, yb, glassTop, 0, D, f.Um);
+    const m = Math.max(1, Math.round(L / 1.8));
+    for (let i = 1; i < m; i++) {
+      const t = (i * L) / m;
+      f.front(k.metal, t - 0.04, t + 0.04, yb, glassTop, D + 0.02);
+    }
+    f.front(k.stone, 0, L, glassTop, yTop, 0);
+  } else {
+    f.front(k.stone, 0, L, yb, yTop, 0);
+  }
+  // Coronament: capçal de pedra lleugerament més alt.
+  f.parapet(k.stone, yTop, 0.5, 0.35);
+}
+
+/** BSC: mur de vidre enfonsat amb lamel·les verticals blanques cada 0,6 m i forjats marcats. */
+function finsEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const DG = -0.55;
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.concrete, yTop, 0.6, 0.3);
+  f.front(k.glass, 0, L, yb, yTop, DG);
+  f.side(k.concrete, 0, yb, yTop, 0, DG, f.U);
+  f.side(k.concrete, L, yb, yTop, 0, DG, f.Um);
+  for (let fl = 1; fl < floors; fl++) {
+    const y = yb + fl * floorH;
+    f.flat(k.concrete, 0, L, y + 0.15, 0, DG, true);
+    f.flat(k.concrete, 0, L, y - 0.15, 0, DG, false);
+    f.front(k.concrete, 0, L, y - 0.15, y + 0.15, 0);
+  }
+  const n = Math.max(1, Math.round(L / 0.6));
+  for (let i = 0; i <= n; i++) {
+    const t = (i * L) / n;
+    const t0 = Math.max(0, t - 0.05);
+    const t1 = Math.min(L, t + 0.05);
+    // Les lamel·les no arriben a terra: deixen la planta baixa oberta a la vista.
+    f.front(k.metal, t0, t1, yb + Math.min(3, floorH), yTop, 0);
+    if (i > 0) f.side(k.metal, t0, yb + Math.min(3, floorH), yTop, 0, -0.35, f.Um);
+    if (i < n) f.side(k.metal, t1, yb + Math.min(3, floorH), yTop, 0, -0.35, f.U);
   }
 }
 
@@ -695,6 +829,7 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
     glass: new MeshBuilder(),
     metal: new MeshBuilder(),
     plaster: new MeshBuilder({ [COLOR_ATTR]: 3 }),
+    stone: new MeshBuilder(),
   };
   for (const b of buildings) {
     if (!hasFacadeKit(b)) continue;
@@ -708,6 +843,9 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
         if (b.facade === "campus") campusEdge(f, b, k);
         else if (b.facade === "arcade") arcadeEdge(f, b, k);
         else if (b.facade === "glass") glassEdge(f, b, k, rgb);
+        else if (b.facade === "brick") brickEdge(f, b, k);
+        else if (b.facade === "stone") stoneEdge(f, b, k);
+        else if (b.facade === "fins") finsEdge(f, b, k);
         else punchedEdge(f, b, k, rgb);
       }
     }
@@ -718,5 +856,57 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
     glass: k.glass.build(),
     metal: k.metal.build(),
     plaster: k.plaster.build(),
+    stone: k.stone.build(),
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Col·lisió dels edificis amb porxo (fila A)
+
+/**
+ * Closca de col·lisió dels edificis `arcade`: la planta baixa dels trams llargs és oberta (pilars + paret del fons
+ * a la profunditat del porxo), de manera que es pot caminar sota el porxo. Coincideix amb el que dibuixa arcadeEdge.
+ */
+export function buildArcadeCollision(buildings: readonly BuildingData[]): MeshData {
+  const mb = new MeshBuilder();
+  const K = ARCADE_KIT;
+  for (const b of buildings) {
+    if (b.facade !== "arcade" || b.background) continue;
+    const floors = Math.max(1, b.levels);
+    const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+    const y1 = yb + b.height / floors;
+    const yTop = b.baseY + b.height;
+    const bottom = b.minHeight > 0 ? yb : b.footY;
+    for (const ring of [b.footprint, ...b.holes]) {
+      for (let e = 0; e < ring.length; e++) {
+        const a = ring[e];
+        const c = ring[(e + 1) % ring.length];
+        if (Math.hypot(c[0] - a[0], c[1] - a[1]) < 0.05) continue;
+        const f = new EdgeFrame(a, c, b.baseY);
+        const L = f.L;
+        if (L >= ARCADE_MIN_EDGE) {
+          const D = -K.portico;
+          f.front(mb, 0, L, y1, yTop, 0);
+          f.flat(mb, 0, L, y1, 0, D, false); // sostre del porxo
+          f.front(mb, 0, L, bottom, y1, D); // paret del fons
+          f.side(mb, 0, bottom, y1, 0, D, f.U);
+          f.side(mb, L, bottom, y1, 0, D, f.Um);
+          const n = Math.max(1, Math.round(L / K.pillarSpacing));
+          const hp = K.pillar / 2;
+          for (let i = 0; i <= n; i++) {
+            const t = (i * L) / n;
+            const t0 = Math.max(0, t - hp);
+            const t1 = Math.min(L, t + hp);
+            f.front(mb, t0, t1, bottom, y1, 0);
+            f.front(mb, t0, t1, bottom, y1, -K.pillar, {}, true);
+            if (i > 0) f.side(mb, t0, bottom, y1, 0, -K.pillar, f.Um);
+            if (i < n) f.side(mb, t1, bottom, y1, 0, -K.pillar, f.U);
+          }
+        } else {
+          f.front(mb, 0, L, bottom, yTop, 0);
+        }
+      }
+    }
+  }
+  return mb.build();
 }
