@@ -195,11 +195,29 @@ export async function startGame(ctx: SceneContext, hudRoot: HTMLElement): Promis
     }
   }
 
+  // Resolució adaptativa: si els fotogrames són lents es baixa la resolució interna, i es recupera quan hi ha marge.
+  const maxRatio = Math.min(window.devicePixelRatio, 2);
+  let ratio = maxRatio;
+  let frameEma = 1 / 60;
+  let lastRatioChange = performance.now();
+  function adaptResolution(dt: number, now: number): void {
+    frameEma += (dt - frameEma) * 0.05;
+    if (now - lastRatioChange < 2000) return;
+    const next = frameEma > 0.019 ? Math.max(0.75, ratio - 0.25) : frameEma < 0.012 ? Math.min(maxRatio, ratio + 0.25) : ratio;
+    if (next !== ratio) {
+      ratio = next;
+      renderer.setPixelRatio(ratio);
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      lastRatioChange = now;
+    }
+  }
+
   let last = performance.now();
   renderer.setAnimationLoop(() => {
     const now = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    if (document.visibilityState === "visible") adaptResolution(dt, now);
 
     if (running()) {
       accumulator += dt;
@@ -266,6 +284,6 @@ export async function startGame(ctx: SceneContext, hudRoot: HTMLElement): Promis
 
   if (import.meta.env.DEV) {
     // Accés de depuració des de la consola del navegador.
-    Object.assign(window, { __shutter: { state, weapons, input, physics, dummies } });
+    Object.assign(window, { __shutter: { state, weapons, input, physics, dummies, renderer, scene, camera, viewmodel } });
   }
 }

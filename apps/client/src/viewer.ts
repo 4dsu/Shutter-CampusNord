@@ -42,6 +42,8 @@ export function startViewer(ctx: SceneContext, hud: HTMLElement): void {
     return el;
   };
 
+  if (import.meta.env.DEV) Object.assign(window, { __viewer: { renderer, scene, camera, env } });
+
   let frames = 0;
   let fpsTime = performance.now();
   const clock = new THREE.Clock();
