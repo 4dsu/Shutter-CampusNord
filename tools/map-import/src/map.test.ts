@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { type MapData, MAP_FORMAT_VERSION, TerrainField, area, pointInRing, signedArea } from "@shutter/shared/map";
+import { type MapData, MAP_FORMAT_VERSION, TerrainField, area, pointInRing, resamplePolyline, signedArea } from "@shutter/shared/map";
 
 /** Valida el mapa generat que hi ha al repositori (assets/maps/campus-nord.json). */
 const map = JSON.parse(readFileSync(new URL("../../../assets/maps/campus-nord.json", import.meta.url), "utf8")) as MapData;
@@ -51,6 +51,24 @@ describe("mapa del Campus Nord", () => {
     // El campus fa pendent cap al sud-est: la fila D és més alta que la fila A.
     const base = (id: string) => map.buildings.find((b) => b.id === id || b.id === `${id}-p0`)!.baseY;
     expect(base("D3")).toBeGreaterThan(base("A3"));
+  });
+
+  it("la Plaça de les Constel·lacions és el terrat del poliesportiu, semisoterrat", () => {
+    const deck = map.buildings.find((b) => b.id === "poliesportiu")!;
+    const top = deck.baseY + deck.height;
+    const edge = resamplePolyline([...deck.footprint, deck.footprint[0]], 1);
+    const drop = edge.map(([x, z]) => top - terrain.heightAt(x, z));
+    // Cap a la gespa del sud hi ha la façana del poliesportiu (més d'una planta)...
+    expect(Math.max(...drop)).toBeGreaterThan(4);
+    // ...i pel costat alt s'hi arriba caminant (esglaó ≤ 0,4 m).
+    expect(drop.filter((d) => d < 0.4).length / edge.length).toBeGreaterThan(0.25);
+    const skylights = map.buildings.filter((b) => b.id.startsWith("poliesportiu-lucernari"));
+    expect(skylights.length).toBeGreaterThanOrEqual(4);
+    for (const s of skylights) {
+      expect(s.baseY).toBeCloseTo(top, 1);
+      expect(s.footprint.every((p) => pointInRing(p, deck.footprint))).toBe(true);
+    }
+    expect(map.props.some((p) => pointInRing(p.pos, deck.footprint))).toBe(false);
   });
 
   it("el límit jugable és un polígon raonable", () => {

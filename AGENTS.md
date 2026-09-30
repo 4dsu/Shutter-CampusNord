@@ -46,7 +46,7 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 | `apps/client/src/render/` | Escena Three.js: terreny, façanes, objectes, rètols, cel |
 | `apps/client/src/debug/` | Eines de depuració (càmera lliure del visor) |
 | `apps/server/src/` | Servidor HTTP + WebSocket (`index.ts`), fitxers estàtics (`static.ts`) |
-| `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `projection.ts` |
+| `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `plaza.ts` (places elevades), `projection.ts` |
 | `assets/maps/campus-nord.json` | Mapa generat. **No l'editis a mà**: canvia l'importador o `overrides.ts` i torna a executar-lo |
 
 ## 4. Convencions obligatòries
@@ -126,6 +126,8 @@ Hi treballen diverses persones, cadascuna amb el seu agent. Per no barrejar fein
   - Respecta la política d'ús: l'importador guarda les descàrregues a `tools/map-import/.cache/` (ignorada per git).
   - Fes servir `--refresh` només quan calgui.
 - **Edificis sense nom a OSM:** A4, A5, A6, B3 i B6 no tenen nom i s'identifiquen per id de via a `tools/map-import/src/overrides.ts`.
+- **Places elevades:** la Plaça de les Constel·lacions és el terrat del poliesportiu. El MET-5 és terreny nu i OSM només en té la caixa,
+  així que `plaza.ts` converteix l'edifici en la plaça sencera (`PLAZA_DECKS` a `overrides.ts`) i fa rampa amb el terreny del costat alt.
 - **Parts d'edificis:** un edifici amb `building:part` es divideix en volums (`A5-p0`, `A5-p1`…). L'interior i el rètol van a la part més gran.
 - **Dades ODbL:** qualsevol canvi a `assets/maps/` ha de mantenir l'atribució (`map.attribution`, `assets/maps/LICENSE.md`).
 - **Node:** el servidor s'executa amb `node --watch src/index.ts`, no amb `tsx`. Si Node es queixa de sintaxi, segurament has fet servir sintaxi no esborrable.

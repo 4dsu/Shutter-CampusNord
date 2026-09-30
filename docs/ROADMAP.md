@@ -20,6 +20,10 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [x] Geometria compartida (terreny, edificis, murs) amb tests d'orientació de cares
 - [x] Visor 3D: façanes procedurals (maó i formigó de les files A–D, vidre, finestres retallades), rètols, cel, ombres, objectes instanciats
 - [x] Tests del mapa generat (A1–D6 presents, polígons vàlids, alçades reals)
+- [x] Plaça de les Constel·lacions elevada: és el terrat del poliesportiu (semisoterrat, vidrieres cap al sud), amb lucernaris i rampa des del costat alt (`plaza.ts`)
+- [x] Façanes segons fotografies: porxos a la planta baixa de la fila A, Omega de formigó blanc amb finestres en franja, Nexus I de xapa fosca, enllosat als terrats
+- [ ] Millora pendent: barana a la vora de la plaça i l'escala de cargol de la cantonada oest
+- [ ] Millora pendent: plaques solars als terrats de la fila A i lucernaris en dent de serra de la Biblioteca
 - [ ] Millora pendent: murs de contenció amb desnivell sec (ara el terreny hi fa una rampa suau)
 - [ ] Millora pendent: textura de terra més nítida de prop (textura de detall o decals de camí)
 

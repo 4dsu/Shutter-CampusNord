@@ -54,11 +54,14 @@ export const BUILDING_OVERRIDES: Record<number, BuildingOverride> = {
   1436110225: { id: "pavello-a2a3", facade: "glass", color: "#dcd9d2" },
   1436110226: { id: "pavello-a1a2", facade: "glass", color: "#dcd9d2" },
   // Altres edificis del campus (colors a partir de fotografies)
-  642719972: { id: "omega", label: "Ω", facade: "glass", color: "#e4ded2" },
+  // Omega: formigó blanc amb finestres en franja (no és una façana de vidre).
+  642719972: { id: "omega", label: "Ω", facade: "strips", color: "#e6e1d6" },
   642719966: { id: "nexus2", name: "Nexus II", label: "NEXUS II", facade: "punched", color: "#c98b6f" },
-  18116538: { id: "nexus1", facade: "punched", color: "#d6cbb8" },
+  // Nexus I: el cilindre de xapa fosca que es veu des de la plaça.
+  18116538: { id: "nexus1", facade: "glass", color: "#5b5d5f", roofColor: "#6f7072" },
   642719980: { id: "biblioteca", label: "BIBLIOTECA", facade: "glass", color: "#d8d2c4", interior: "biblioteca" },
-  187660313: { id: "poliesportiu", kind: "sports", levels: 2, height: 9, color: "#c9c3b6" },
+  // Poliesportiu: soterrat sota la Plaça de les Constel·lacions (vegeu PLAZA_DECKS).
+  187660313: { id: "poliesportiu", kind: "sports" },
   642719955: { id: "capella", label: "CAPELLA", facade: "punched", color: "#d9bf9f", roofColor: "#a86e52" },
   593611153: { id: "bsc", name: "BSC-Repsol", facade: "glass", color: "#eef0f1" },
   642719945: { id: "tillers", facade: "punched", color: "#cfc6b5" },
@@ -71,3 +74,21 @@ export const CAMPUS_GRID_STYLE = {
   colors: ["#b0583b", "#aa5337", "#b65f40"],
   roofColor: "#8e8b85",
 };
+
+/**
+ * Places que són el terrat d'un edifici semisoterrat (vegeu plaza.ts). L'edifici passa a ocupar tota la zona
+ * pavimentada que el conté i el terrat queda a l'altura del costat alt de la plaça.
+ */
+export interface PlazaDeckSpec {
+  /** Id de l'edifici que queda a sota de la plaça. */
+  building: string;
+  /** Façana del sòcol. */
+  color: string;
+  /** Paviment de la plaça (el terrat). */
+  deckColor: string;
+}
+
+export const PLAZA_DECKS: PlazaDeckSpec[] = [
+  // Plaça de les Constel·lacions: el poliesportiu és a sota i s'obre amb vidrieres cap a la gespa del sud.
+  { building: "poliesportiu", color: "#dcd8cf", deckColor: "#cdc6b7" },
+];

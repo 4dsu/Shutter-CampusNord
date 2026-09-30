@@ -15,6 +15,7 @@ import {
   type WallData,
   type WallKind,
   MAP_FORMAT_VERSION,
+  TerrainField,
   area,
   bounds,
   centroid,
@@ -28,7 +29,8 @@ import {
 } from "@shutter/shared/map";
 import { type Dem, sampleDem } from "./dem.ts";
 import { type OsmIndex, type OsmWay, type Tags, isClosedWay, parseNumber } from "./osm.ts";
-import { BUILDING_OVERRIDES, CAMPUS_GRID_STYLE } from "./overrides.ts";
+import { BUILDING_OVERRIDES, CAMPUS_GRID_STYLE, PLAZA_DECKS } from "./overrides.ts";
+import { raisePlazaDecks } from "./plaza.ts";
 
 export const CAMPUS_RELATION_ID = 19836574;
 
@@ -604,11 +606,15 @@ export interface BuildInput {
 export function buildMap({ osm, dem, frame, grid, playArea }: BuildInput): MapData {
   const terrain = sampleTerrain(dem, frame, grid);
   const ctx: BuildContext = { osm, grid, heights: terrain.heights, playArea };
-  const buildings = extractBuildings(ctx);
   const areas = extractAreas(ctx);
   const paths = extractPaths(ctx);
   const walls = extractWalls(ctx);
-  const props = extractProps(ctx, paths);
+  // Les places elevades modifiquen el terreny (rampes), els edificis i els objectes: va l'últim.
+  const field = new TerrainField(grid.originX, grid.originZ, grid.cellSize, grid.cols, grid.rows, terrain.heights);
+  const { buildings, props } = raisePlazaDecks(
+    { buildings: extractBuildings(ctx), areas, props: extractProps(ctx, paths), terrain: field },
+    PLAZA_DECKS,
+  );
   return {
     format: MAP_FORMAT_VERSION,
     name: "Campus Nord (UPC)",
