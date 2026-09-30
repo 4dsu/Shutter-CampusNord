@@ -30,7 +30,8 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [x] Editor `?mode=editor`: ortofoto + edificis del joc + Cadastre per comparar
 - [x] Kit de façana A–D amb relleu real (formigó, maó enfonsat, finestres amb lamel·les) i textures PBR CC0
 - [ ] Fila A, B2–B5 i B0 (el Cadastre no les té): corregir contorns amb l'editor
-- [ ] Editor: moure vèrtexs, marcar porxos, places, terrasses, escales i murs → `tools/map-import/corrections.json`
+- [x] Editor: moure vèrtexs, propietats (plantes, alçada, porxo, façana), copiar contorns del Cadastre, edificis nous i places planes → `tools/map-import/corrections.json` + regeneració automàtica
+- [ ] Editor: escales i murs de contenció
 - [ ] Kits per als altres estils (mur cortina de vidre per a Omega/BSC, finestres retallades amb relleu)
 - [ ] Edificis singulars a partir de fotos (`docs/FOTOS.md`)
 - [ ] Terrasses i murs de contenció amb desnivell sec; escales amb graons

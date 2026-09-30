@@ -9,6 +9,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/ws": { target: "ws://localhost:3000", ws: true },
+      // Eines de l'editor del mapa (només en desenvolupament).
+      "/dev": { target: "http://localhost:3000" },
     },
   },
   build: {

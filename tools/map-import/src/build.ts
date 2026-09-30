@@ -6,6 +6,7 @@ import {
   type Entrance,
   type EntranceKind,
   type FacadeStyle,
+  type MapCorrections,
   type MapData,
   type PathData,
   type PathKind,
@@ -28,6 +29,7 @@ import {
 } from "@shutter/shared/map";
 import type { CatastroPart } from "./catastro.ts";
 import { mergeCatastroBuildings } from "./catastroMerge.ts";
+import { applyBuildingCorrections, applyPlatforms } from "./corrections.ts";
 import { type Dem, sampleDem } from "./dem.ts";
 import { type OsmIndex, type OsmWay, type Tags, isClosedWay, parseNumber } from "./osm.ts";
 import { BUILDING_OVERRIDES, CAMPUS_GRID_STYLE } from "./overrides.ts";
@@ -602,22 +604,21 @@ export interface BuildInput {
   grid: GridSpec;
   playArea: Vec2[];
   catastro: CatastroPart[];
+  corrections: MapCorrections;
   /** Línies de l'informe OSM ↔ Cadastre (s'hi afegeixen). */
   report: string[];
 }
 
-export function buildMap({ osm, dem, frame, grid, playArea, catastro, report }: BuildInput): MapData {
+export function buildMap({ osm, dem, frame, grid, playArea, catastro, corrections, report }: BuildInput): MapData {
   const terrain = sampleTerrain(dem, frame, grid);
+  // Les places i terrasses corregides s'aplanen abans de calcular la base dels edificis.
+  applyPlatforms(grid, terrain.heights, terrain.datum, corrections);
+  const heightAt = makeHeightAt(grid, terrain.heights);
   const ctx: BuildContext = { osm, grid, heights: terrain.heights, playArea };
-  const merged = mergeCatastroBuildings(
-    extractBuildings(ctx),
-    catastro,
-    playArea,
-    makeHeightAt(grid, terrain.heights),
-    (b) => FLOOR_HEIGHT[b.kind],
-  );
+  const floorHeight = (b: BuildingData): number => FLOOR_HEIGHT[b.kind];
+  const merged = mergeCatastroBuildings(extractBuildings(ctx), catastro, playArea, heightAt, floorHeight);
   report.push(...merged.report);
-  const buildings = merged.buildings;
+  const buildings = applyBuildingCorrections(merged.buildings, corrections, heightAt, floorHeight);
   const areas = extractAreas(ctx);
   const paths = extractPaths(ctx);
   const walls = extractWalls(ctx);

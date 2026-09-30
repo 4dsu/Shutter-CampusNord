@@ -99,6 +99,18 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 - Imita el codi del voltant: comentaris breus en català que expliquen el *perquè*, funcions petites i sense abstraccions prematures.
 - Cap dependència nova sense motiu clar. Si n'afegeixes una, explica al PR per què.
 
+### Correccions del mapa
+
+- Les correccions manuals viuen a `tools/map-import/corrections.json` (tipus `MapCorrections` a `packages/shared/src/map/corrections.ts`):
+  - canvis d'edificis per id: contorn, plantes, alçada, alçada inicial (porxos) i estil de façana; o `remove: true`;
+  - edificis nous (`added`);
+  - places i terrasses planes (`platforms`), amb una alçada en m sobre el mar.
+- L'importador les aplica per sobre d'OSM i del Cadastre.
+- Maneres de fer-les:
+  - **Amb l'editor** (`?mode=editor`, amb `npm run dev` en marxa): **Desa i regenera** escriu el fitxer i torna a executar l'importador a través del servidor de desenvolupament (`PUT /dev/corrections`, només amb `--dev` i des de localhost).
+  - **A mà:** edita el JSON i executa `npm run map:import`.
+- Fes commit de `corrections.json` **i** dels fitxers regenerats de `assets/maps/` en el mateix commit.
+
 ### Proves al navegador
 
 - **`?mode=viewer`:** visor del mapa amb càmera lliure. Amb `&cam=x,y,z,yaw,pitch` es posa la càmera en un punt concret.

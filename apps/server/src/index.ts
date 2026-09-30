@@ -2,11 +2,14 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { WS_PATH } from "@shutter/shared/constants";
 import { PROTOCOL_VERSION } from "@shutter/shared/protocol";
+import { handleDevRequest } from "./devtools.ts";
 import { serveStatic } from "./static.ts";
 
 // `--port` té prioritat sobre PORT: en desenvolupament el proxy de Vite espera el servidor al 3000.
 const portArg = process.argv.indexOf("--port");
 const PORT = Number(portArg > 0 ? process.argv[portArg + 1] : (process.env.PORT ?? 3000));
+/** Eines de l'editor del mapa (desar correccions i regenerar el mapa): només en desenvolupament. */
+const DEV = process.argv.includes("--dev");
 
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {
@@ -14,11 +17,14 @@ const httpServer = createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, protocol: PROTOCOL_VERSION }));
     return;
   }
-  serveStatic(req, res).catch((err: unknown) => {
-    console.error("[http]", err);
-    if (!res.headersSent) res.writeHead(500);
-    res.end();
-  });
+  const handled = DEV ? handleDevRequest(req, res) : Promise.resolve(false);
+  handled
+    .then((done) => (done ? undefined : serveStatic(req, res)))
+    .catch((err: unknown) => {
+      console.error("[http]", err);
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
 });
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });

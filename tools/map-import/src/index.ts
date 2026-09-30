@@ -15,6 +15,7 @@ import { type Frame, type GridSpec, buildMap, campusPlayArea } from "./build.ts"
 import { parseArcGrid } from "./dem.ts";
 import { cachedFetchText } from "./fetch.ts";
 import { fetchCatastroParts } from "./catastro.ts";
+import { loadCorrections } from "./corrections.ts";
 import { ORTHO_LAYER, fetchOrthophoto } from "./orthophoto.ts";
 import { OsmIndex, type OsmJson } from "./osm.ts";
 import { latLonToUtm } from "./projection.ts";
@@ -34,6 +35,8 @@ const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const CACHE_DIR = `${ROOT}tools/map-import/.cache/`;
 const OUT_FILE = `${ROOT}assets/maps/campus-nord.json`;
 const ORTHO_FILE = "campus-nord-orto.jpg";
+/** Correccions manuals (editor del mapa o a mà). */
+const CORRECTIONS_FILE = `${ROOT}tools/map-import/corrections.json`;
 /** Dades de referència per a l'editor del mapa (no les carrega el joc). */
 const REFERENCE_FILE = `${ROOT}assets/maps/campus-nord-reference.json`;
 
@@ -135,8 +138,13 @@ async function main(): Promise<void> {
   console.log(`  ${catastro.length} parts en ${new Set(catastro.map((p) => p.ref)).size} parcel·les`);
 
   console.log("5/6 Generant el mapa");
+  const corrections = await loadCorrections(CORRECTIONS_FILE);
+  console.log(
+    `  correccions: ${Object.keys(corrections.buildings).length} edificis, ${corrections.added.length} nous, ` +
+      `${corrections.platforms.length} plataformes`,
+  );
   const report: string[] = [];
-  const map: MapData = buildMap({ osm, dem, frame, grid, playArea, catastro, report });
+  const map: MapData = buildMap({ osm, dem, frame, grid, playArea, catastro, corrections, report });
   console.log("  Informe OSM → Cadastre:");
   for (const line of report) console.log(`   ${line}`);
   map.orthophoto = { file: ORTHO_FILE, width: ortho.width, height: ortho.height };
