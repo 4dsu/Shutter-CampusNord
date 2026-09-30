@@ -90,7 +90,8 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   for (const key of ["brick", "concrete", "glass", "louver"] as const) {
     const mesh = new THREE.Mesh(toBufferGeometry(kit[key]), kitMaterials[key]);
     mesh.name = `kit-${key}`;
-    mesh.castShadow = key !== "glass";
+    // Només la graella de formigó projecta ombra: el maó, el vidre i les lamel·les són enfonsats i en fan poca.
+    mesh.castShadow = key === "concrete";
     mesh.receiveShadow = true;
     group.add(mesh);
   }
