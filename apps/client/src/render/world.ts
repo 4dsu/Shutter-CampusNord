@@ -16,6 +16,8 @@ import { createProps } from "./props.ts";
 export interface LoadedMap {
   map: MapData;
   terrain: TerrainField;
+  /** Ortofoto de l'ICGC que cobreix l'extensió del terreny (fila 0 = nord). */
+  ortho: ImageBitmap | null;
 }
 
 export async function loadMap(url: string): Promise<LoadedMap> {
@@ -23,20 +25,38 @@ export async function loadMap(url: string): Promise<LoadedMap> {
   if (!res.ok) throw new Error(`No s'ha pogut carregar el mapa (${res.status})`);
   const map = (await res.json()) as MapData;
   if (map.format !== MAP_FORMAT_VERSION) throw new Error(`Format de mapa ${map.format} no suportat`);
-  return { map, terrain: TerrainField.fromData(map.terrain) };
+  let ortho: ImageBitmap | null = null;
+  if (map.orthophoto) {
+    const img = await fetch(new URL(map.orthophoto.file, new URL(url, location.href)));
+    if (img.ok) ortho = await createImageBitmap(await img.blob());
+  }
+  return { map, terrain: TerrainField.fromData(map.terrain), ortho };
 }
 
 export interface World {
   group: THREE.Group;
-  groundCanvas: HTMLCanvasElement;
+  /** Imatge del terra vist des de dalt (serveix per al minimapa). */
+  groundImage: CanvasImageSource;
 }
 
-export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRenderer): World {
+function orthoTexture(image: ImageBitmap, renderer: THREE.WebGLRenderer): THREE.Texture {
+  const tex = new THREE.Texture(image);
+  tex.flipY = false; // fila 0 = z mínima = uv.v 0 (ImageBitmap no es gira)
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.WebGLRenderer): World {
   const group = new THREE.Group();
   group.name = "world";
 
-  const groundCanvas = bakeGround(map, terrain, 0.25);
-  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTexture(groundCanvas, renderer)));
+  // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
+  const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
+  const groundTex = ortho ? orthoTexture(ortho, renderer) : groundTexture(groundImage as HTMLCanvasElement, renderer);
+  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho));
   ground.name = "terrain";
   ground.receiveShadow = true;
   group.add(ground);
@@ -46,7 +66,19 @@ export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRe
   facades.name = "facades";
   facades.castShadow = true;
   facades.receiveShadow = true;
-  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  const roofMaterial = new THREE.MeshStandardMaterial({ vertexColors: !ortho, roughness: 0.95 });
+  if (ortho) {
+    // Els terrats tenen uv = (x, z) en metres: es projecta l'ortofoto des de dalt.
+    const width = (terrain.cols - 1) * terrain.cellSize;
+    const depth = (terrain.rows - 1) * terrain.cellSize;
+    const roofTex = groundTex.clone();
+    roofTex.repeat.set(1 / width, 1 / depth);
+    roofTex.offset.set(-terrain.originX / width, -terrain.originZ / depth);
+    roofTex.needsUpdate = true;
+    roofMaterial.map = roofTex;
+    roofMaterial.color.setScalar(0.62); // la foto ja porta la llum del sol
+  }
+  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), roofMaterial);
   roofMesh.name = "roofs";
   roofMesh.castShadow = true;
   roofMesh.receiveShadow = true;
@@ -64,5 +96,5 @@ export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRe
   group.add(createProps(map.props, terrain));
   group.add(createLabels(map.buildings));
 
-  return { group, groundCanvas };
+  return { group, groundImage };
 }

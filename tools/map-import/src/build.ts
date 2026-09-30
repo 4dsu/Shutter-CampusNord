@@ -26,6 +26,8 @@ import {
   resamplePolyline,
   withOrientation,
 } from "@shutter/shared/map";
+import type { CatastroPart } from "./catastro.ts";
+import { mergeCatastroBuildings } from "./catastroMerge.ts";
 import { type Dem, sampleDem } from "./dem.ts";
 import { type OsmIndex, type OsmWay, type Tags, isClosedWay, parseNumber } from "./osm.ts";
 import { BUILDING_OVERRIDES, CAMPUS_GRID_STYLE } from "./overrides.ts";
@@ -90,7 +92,7 @@ export function sampleTerrain(dem: Dem, frame: Frame, grid: GridSpec): TerrainRe
 }
 
 /** Alçada interpolada sobre la graella (mateixa triangulació que TerrainField.heightAt). */
-function makeHeightAt(grid: GridSpec, heights: Float32Array): (p: Vec2) => number {
+export function makeHeightAt(grid: GridSpec, heights: Float32Array): (p: Vec2) => number {
   return ([x, z]) => {
     const gx = (x - grid.originX) / grid.cellSize;
     const gz = (z - grid.originZ) / grid.cellSize;
@@ -599,12 +601,23 @@ export interface BuildInput {
   frame: Frame;
   grid: GridSpec;
   playArea: Vec2[];
+  catastro: CatastroPart[];
+  /** Línies de l'informe OSM ↔ Cadastre (s'hi afegeixen). */
+  report: string[];
 }
 
-export function buildMap({ osm, dem, frame, grid, playArea }: BuildInput): MapData {
+export function buildMap({ osm, dem, frame, grid, playArea, catastro, report }: BuildInput): MapData {
   const terrain = sampleTerrain(dem, frame, grid);
   const ctx: BuildContext = { osm, grid, heights: terrain.heights, playArea };
-  const buildings = extractBuildings(ctx);
+  const merged = mergeCatastroBuildings(
+    extractBuildings(ctx),
+    catastro,
+    playArea,
+    makeHeightAt(grid, terrain.heights),
+    (b) => FLOOR_HEIGHT[b.kind],
+  );
+  report.push(...merged.report);
+  const buildings = merged.buildings;
   const areas = extractAreas(ctx);
   const paths = extractPaths(ctx);
   const walls = extractWalls(ctx);
@@ -617,6 +630,7 @@ export function buildMap({ osm, dem, frame, grid, playArea }: BuildInput): MapDa
     attribution: [
       "Dades de mapa © OpenStreetMap contributors (ODbL) — openstreetmap.org/copyright",
       "Model d'elevacions del terreny © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0)",
+      "Edificis del campus: Dirección General del Catastro (INSPIRE)",
     ],
     playArea: playArea.map(rp),
     terrain: {

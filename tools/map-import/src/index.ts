@@ -14,6 +14,8 @@ import { type MapData, type Vec2, area, bounds } from "@shutter/shared/map";
 import { type Frame, type GridSpec, buildMap, campusPlayArea } from "./build.ts";
 import { parseArcGrid } from "./dem.ts";
 import { cachedFetchText } from "./fetch.ts";
+import { fetchCatastroParts } from "./catastro.ts";
+import { ORTHO_LAYER, fetchOrthophoto } from "./orthophoto.ts";
 import { OsmIndex, type OsmJson } from "./osm.ts";
 import { latLonToUtm } from "./projection.ts";
 
@@ -31,6 +33,9 @@ const DEM_CELL = 5;
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const CACHE_DIR = `${ROOT}tools/map-import/.cache/`;
 const OUT_FILE = `${ROOT}assets/maps/campus-nord.json`;
+const ORTHO_FILE = "campus-nord-orto.jpg";
+/** Dades de referència per a l'editor del mapa (no les carrega el joc). */
+const REFERENCE_FILE = `${ROOT}assets/maps/campus-nord-reference.json`;
 
 async function fetchDem(minE: number, minN: number, maxE: number, maxN: number, refresh: boolean): Promise<string> {
   const width = Math.round((maxE - minE) / DEM_CELL);
@@ -66,7 +71,7 @@ async function main(): Promise<void> {
     return [u.easting - frame.e0, frame.n0 - u.northing];
   };
 
-  console.log("1/4 OpenStreetMap");
+  console.log("1/6 OpenStreetMap");
   const b = OSM_BBOX;
   const osmText = await cachedFetchText(
     `https://api.openstreetmap.org/api/0.6/map.json?bbox=${b.minLon},${b.minLat},${b.maxLon},${b.maxLat}`,
@@ -100,7 +105,7 @@ async function main(): Promise<void> {
     console.warn("  ⚠ La graella del terreny surt de la zona descarregada d'OSM: hi pot faltar decorat a les vores.");
   }
 
-  console.log(`2/4 Terreny ICGC 5 m → graella ${grid.cols} × ${grid.rows} de ${CELL_SIZE} m`);
+  console.log(`2/6 Terreny ICGC 5 m → graella ${grid.cols} × ${grid.rows} de ${CELL_SIZE} m`);
   const snap = (v: number, up: boolean): number => (up ? Math.ceil(v / DEM_CELL) : Math.floor(v / DEM_CELL)) * DEM_CELL;
   const demText = await fetchDem(
     snap(frame.e0 + originX - 15, false),
@@ -111,13 +116,46 @@ async function main(): Promise<void> {
   );
   const dem = parseArcGrid(demText);
 
-  console.log("3/4 Generant el mapa");
-  const map: MapData = buildMap({ osm, dem, frame, grid, playArea });
+  console.log(`3/6 Ortofoto ICGC (${ORTHO_LAYER})`);
+  const ortho = await fetchOrthophoto(frame, grid, CACHE_DIR, refresh);
+  console.log(`  ${ortho.width} × ${ortho.height} px, ${(ortho.jpeg.length / 1024 / 1024).toFixed(1)} MB`);
 
-  console.log("4/4 Desant");
+  console.log("4/6 Cadastre (parts d'edifici)");
+  const catastro = await fetchCatastroParts(
+    {
+      minE: Math.floor(frame.e0 + pb.minX - 20),
+      minN: Math.floor(frame.n0 - pb.maxZ - 20),
+      maxE: Math.ceil(frame.e0 + pb.maxX + 20),
+      maxN: Math.ceil(frame.n0 - pb.minZ + 20),
+    },
+    (e, n) => [e - frame.e0, frame.n0 - n],
+    CACHE_DIR,
+    refresh,
+  );
+  console.log(`  ${catastro.length} parts en ${new Set(catastro.map((p) => p.ref)).size} parcel·les`);
+
+  console.log("5/6 Generant el mapa");
+  const report: string[] = [];
+  const map: MapData = buildMap({ osm, dem, frame, grid, playArea, catastro, report });
+  console.log("  Informe OSM → Cadastre:");
+  for (const line of report) console.log(`   ${line}`);
+  map.orthophoto = { file: ORTHO_FILE, width: ortho.width, height: ortho.height };
+  map.attribution.push("Ortofoto de Catalunya 25 cm (2025) © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0)");
+
+  console.log("6/6 Desant");
+  await writeFile(`${dirname(OUT_FILE)}/${ORTHO_FILE}`, ortho.jpeg);
   const json = JSON.stringify(map);
   await mkdir(dirname(OUT_FILE), { recursive: true });
   await writeFile(OUT_FILE, json);
+  const r2 = (v: number): number => Math.round(v * 100) / 100;
+  const ring = (pts: Vec2[]): Vec2[] => pts.map(([x, z]) => [r2(x), r2(z)]);
+  await writeFile(
+    REFERENCE_FILE,
+    JSON.stringify({
+      attribution: ["Edificis: Dirección General del Catastro (INSPIRE)"],
+      catastro: catastro.map((p) => ({ ...p, outer: ring(p.outer), holes: p.holes.map(ring) })),
+    }),
+  );
   printSummary(map, json.length);
 }
 

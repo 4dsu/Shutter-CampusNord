@@ -22,6 +22,8 @@ export interface MapData {
   /** Polígon on es pot jugar (límit del campus). */
   playArea: Vec2[];
   terrain: TerrainData;
+  /** Ortofoto que cobreix exactament l'extensió del terreny (fila 0 = nord). */
+  orthophoto?: { file: string; width: number; height: number };
   buildings: BuildingData[];
   areas: AreaData[];
   paths: PathData[];

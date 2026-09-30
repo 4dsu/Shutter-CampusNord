@@ -4,7 +4,9 @@ import { WS_PATH } from "@shutter/shared/constants";
 import { PROTOCOL_VERSION } from "@shutter/shared/protocol";
 import { serveStatic } from "./static.ts";
 
-const PORT = Number(process.env.PORT ?? 3000);
+// `--port` té prioritat sobre PORT: en desenvolupament el proxy de Vite espera el servidor al 3000.
+const portArg = process.argv.indexOf("--port");
+const PORT = Number(portArg > 0 ? process.argv[portArg + 1] : (process.env.PORT ?? 3000));
 
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {

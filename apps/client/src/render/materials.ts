@@ -105,9 +105,14 @@ roughnessFactor = mix(roughnessFactor, 0.15, facadeGlass);`,
   return mat;
 }
 
-/** Terreny: textura del terra pintada + soroll de detall perquè de prop no es vegi borrós. */
-export function createTerrainMaterial(ground: THREE.Texture): THREE.MeshStandardMaterial {
+/**
+ * Terreny: textura del terra + soroll de detall perquè de prop no es vegi borrós.
+ * `photo` indica que la textura és una fotografia aèria, que ja porta la llum del sol: s'enfosqueix perquè
+ * no quedi il·luminada dues vegades.
+ */
+export function createTerrainMaterial(ground: THREE.Texture, photo = false): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ map: ground, roughness: 0.95, metalness: 0 });
+  if (photo) mat.color.setScalar(0.62);
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vTerrainPos;")

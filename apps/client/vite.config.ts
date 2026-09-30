@@ -6,6 +6,7 @@ export default defineConfig({
   publicDir: fileURLToPath(new URL("../../assets", import.meta.url)),
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       "/ws": { target: "ws://localhost:3000", ws: true },
     },
