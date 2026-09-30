@@ -32,7 +32,10 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [ ] Fila A, B2–B5 i B0 (el Cadastre no les té): corregir contorns amb l'editor
 - [x] Editor: moure vèrtexs, propietats (plantes, alçada, porxo, façana), copiar contorns del Cadastre, edificis nous i places planes → `tools/map-import/corrections.json` + regeneració automàtica
 - [ ] Editor: escales i murs de contenció
-- [ ] Kits per als altres estils (mur cortina de vidre per a Omega/BSC, finestres retallades amb relleu)
+- [x] Kits per als altres estils (mur cortina de vidre per a Omega/BSC, finestres retallades amb relleu)
+- [x] Textures procedurals pròpies (sense imatges externes) i kit `arcade` de la fila A a partir de fotos de referència de Mapillary
+- [ ] Porxo de la fila A caminable (ara la col·lisió és la closca exterior)
+- [ ] Revisar amb fotos de referència: B3 (vidrieres i rètol), Biblioteca (façana inclinada), Nexus II, BSC
 - [ ] Edificis singulars a partir de fotos (`docs/FOTOS.md`)
 - [ ] Terrasses i murs de contenció amb desnivell sec; escales amb graons
 - [ ] Render: ombres en cascada, SSAO, arbres segons espècie, opció de qualitat baixa

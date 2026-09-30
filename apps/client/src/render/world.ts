@@ -14,7 +14,7 @@ import { createLabels } from "./labels.ts";
 import { createFacadeMaterial, createTerrainMaterial } from "./materials.ts";
 import { toBufferGeometry } from "./meshes.ts";
 import { createProps } from "./props.ts";
-import { loadPbr } from "./textures.ts";
+import { proceduralPbr } from "./textures.ts";
 
 export interface LoadedMap {
   map: MapData;
@@ -57,14 +57,17 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   group.name = "world";
 
   const aniso = renderer.capabilities.getMaxAnisotropy();
-  const bricks = loadPbr("bricks", 1.2, 1.2, aniso);
-  const concreteTex = loadPbr("concrete", 2, 1, aniso);
-  const plaster = loadPbr("plaster", 2, 1, aniso);
+  // Textures procedurals (dibuixades per codi a textures.ts).
+  const bricks = proceduralPbr("facadeBrick", aniso);
+  const concreteTex = proceduralPbr("concrete", aniso);
+  const plaster = proceduralPbr("plaster", aniso);
+  const paverBrick = proceduralPbr("paverBrick", aniso);
+  const concretePaver = proceduralPbr("concretePaver", aniso);
 
   // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
   const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
   const groundTex = ortho ? orthoTexture(ortho, renderer) : groundTexture(groundImage as HTMLCanvasElement, renderer);
-  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho, ortho ? { concrete: concreteTex, brick: bricks } : undefined));
+  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho, ortho ? { concrete: concretePaver, brick: paverBrick } : undefined));
   ground.name = "terrain";
   ground.receiveShadow = true;
   group.add(ground);
@@ -83,8 +86,8 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   const kit = buildFacadeKits(map.buildings);
   const kitMaterials = {
     // Tint una mica més vermell i fosc: de lluny el mosaic es veia massa taronja (foto real de B3).
-    brick: new THREE.MeshStandardMaterial({ ...bricks, color: 0xc49a8c, roughness: 1 }),
-    concrete: new THREE.MeshStandardMaterial({ ...concreteTex, color: 0xd8d4cc, roughness: 1 }),
+    brick: new THREE.MeshStandardMaterial({ ...bricks, roughness: 1 }),
+    concrete: new THREE.MeshStandardMaterial({ ...concreteTex, roughness: 1 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x1c252e, roughness: 0.06, metalness: 0.3, envMapIntensity: 1.4 }),
     metal: new THREE.MeshStandardMaterial({ color: 0xcfd1cf, roughness: 0.45, metalness: 0.4 }),
     plaster: new THREE.MeshStandardMaterial({ ...plaster, vertexColors: true, roughness: 1 }),

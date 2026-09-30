@@ -51,7 +51,8 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 | `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `projection.ts` |
 | `assets/maps/campus-nord.json` | Mapa generat. **No l'editis a mà**: canvia l'importador o `overrides.ts` i torna a executar-lo |
 | `assets/maps/campus-nord-orto.jpg`, `campus-nord-reference.json` | Ortofoto de l'ICGC (terra i terrats) i parts del Cadastre per a l'editor (`?mode=editor`) |
-| `assets/textures/` | Textures PBR CC0 (color, normal, rugositat) amb la mida real de cada repetició al `LICENSE.md` |
+| `apps/client/src/render/textures.ts` | Textures **procedurals** (maó de façana, llambordes, formigó, arrebossat, pedra) dibuixades per codi en canvas |
+| `tools/map-import/src/mapillary.ts` | Informe de cobertura de fotos de Mapillary per edifici (només **referència**; cal `MAPILLARY_TOKEN` a `.env.local`) |
 | `tools/map-import/src/catastro*.ts`, `orthophoto.ts` | Descàrrega del Cadastre i de l'ortofoto; fusió dels edificis OSM amb el Cadastre |
 | `docs/FOTOS.md` | Llista de fotos del campus que es necessiten (i on pujar-les) |
 
@@ -158,6 +159,12 @@ Hi treballen diverses persones, cadascuna amb el seu agent. Per no barrejar fein
   - Geometria i plantes: si hi ha parts del Cadastre, surten d'allà (`catastroMerge.ts`).
   - Nom, rètol, estil i interior: d'OSM i `overrides.ts`.
   - Si el Cadastre diu 0 plantes sobre rasant, l'edifici és soterrat i no es dibuixa.
+- **Textures i façanes:** es fan per codi. Les fotos (Mapillary, pròpies) serveixen només de referència per a colors, mides i aparells: no es fan servir mai com a textura.
+  - Excepció: l'ortofoto de l'ICGC per al terra de lluny i els terrats.
+  - Mides de referència (fotos de Mapillary, 2025):
+    - Fila A: porxo de pilars de formigó a la planta baixa i maó amb finestres retallades a sobre (estil `arcade`).
+    - B4: renovat amb plafons clars.
+    - Passeigs: llambordes de maó vermell fosc. Eix central: llambordes grises.
 - **Ortofoto:** és una foto real, així que ja porta ombres i llum. Els materials que la fan servir s'enfosqueixen (×0,62) perquè no quedi il·luminada dues vegades.
 - **Parts d'edificis:** un edifici amb `building:part` es divideix en volums (`A5-p0`, `A5-p1`…). L'interior i el rètol van a la part més gran.
 - **Dades ODbL:** qualsevol canvi a `assets/maps/` ha de mantenir l'atribució (`map.attribution`, `assets/maps/LICENSE.md`).

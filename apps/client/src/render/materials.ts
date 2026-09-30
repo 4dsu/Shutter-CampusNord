@@ -174,10 +174,11 @@ vec2 terrainBrickUv;`,
   float wBrick = smoothstep(0.435, 0.455, rr + edge) * (1.0 - wGrass);
   float wConcrete = max(0.0, 1.0 - wGrass - wBrick);
   terrainWeights = vec3(wBrick, wGrass, wConcrete);
-  terrainConcreteUv = vTerrainPos.xz / vec2(2.0, 1.0);
-  terrainBrickUv = vTerrainPos.zx / 0.7; // paviment: maons més petits i girats
-  vec3 concreteC = texture(uConcreteMap, terrainConcreteUv).rgb * vec3(0.6, 0.59, 0.56);
-  vec3 brickC = texture(uBrickMap, terrainBrickUv).rgb * vec3(0.78, 0.62, 0.58);
+  // Mides reals de les repeticions: llambordes grises 2,4 m, llambordes de maó 1,6 m (textures.ts).
+  terrainConcreteUv = vTerrainPos.xz / 2.4;
+  terrainBrickUv = vTerrainPos.zx / 1.6;
+  vec3 concreteC = texture(uConcreteMap, terrainConcreteUv).rgb * vec3(0.9, 0.85, 0.78);
+  vec3 brickC = texture(uBrickMap, terrainBrickUv).rgb;
   float g1 = terrainNoise(vTerrainPos.xz * 9.0);
   float g2 = terrainNoise(vTerrainPos.xz * 37.0);
   vec3 grassC = mix(vec3(0.045, 0.085, 0.02), vec3(0.09, 0.14, 0.035), g1) * (0.8 + 0.4 * g2);
@@ -200,7 +201,7 @@ ${
   // Relleu dels materials de prop: normal del mosaic (espai tangent ≈ x, z del món) passada a espai de vista.
   vec3 nc = texture(uConcreteNormal, terrainConcreteUv).xyz * 2.0 - 1.0;
   vec3 nb = texture(uBrickNormal, terrainBrickUv).xyz * 2.0 - 1.0;
-  vec3 dn = nc * terrainWeights.z + nb.yxz * terrainWeights.x;
+  vec3 dn = nc * terrainWeights.z + nb.yxz * terrainWeights.x; // el maó va girat (zx)
   vec3 bump = (viewMatrix * vec4(dn.x, 0.0, -dn.y, 0.0)).xyz;
   normal = normalize(normal + bump * 0.8 * terrainNear);
 }`
@@ -208,6 +209,6 @@ ${
 }`,
       );
   };
-  mat.customProgramCacheKey = () => `terrain-v3-${detail ? "detail" : "plain"}`;
+  mat.customProgramCacheKey = () => `terrain-v4-${detail ? "detail" : "plain"}`;
   return mat;
 }

@@ -439,7 +439,7 @@ export const CAMPUS_KIT = {
 
 /** Quins edificis tenen façana amb relleu (la resta es dibuixen amb la closca i el patró del shader). */
 export function hasFacadeKit(b: BuildingData): boolean {
-  return !b.background && (b.facade === "campus" || b.facade === "glass" || b.facade === "punched");
+  return !b.background && (b.facade === "campus" || b.facade === "glass" || b.facade === "punched" || b.facade === "arcade");
 }
 
 interface KitBuilders {
@@ -509,6 +509,98 @@ function campusEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
         const ly = wy0 + s * slat + slat * 0.25;
         f.front(k.metal, wx0 + 0.02, wx1 - 0.02, ly, ly + slat * 0.45, D1 - 0.04);
       }
+    }
+  }
+}
+
+/** Mides del kit de la fila A (m), a partir de fotos del campus (Mapillary, 2025). */
+export const ARCADE_KIT = {
+  pillarSpacing: 5.4,
+  pillar: 0.9,
+  /** Profunditat del porxo: la paret de vidre de la planta baixa és 3 m endins. */
+  portico: 3,
+  windowSpacing: 2.7,
+  windowWidth: 0.9,
+  reveal: 0.3,
+  cornice: 1.1,
+} as const;
+
+/**
+ * Fila A: porxo a la planta baixa (pilars quadrats de formigó a ras del contorn, sostre i paret vidrada enfonsats),
+ * plantes de maó amb finestres retallades i una cornisa de formigó a dalt.
+ * Nota: la col·lisió és la closca exterior, així que encara no es pot caminar sota el porxo.
+ */
+function arcadeEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+  const K = ARCADE_KIT;
+  const L = f.L;
+  const floors = Math.max(1, b.levels);
+  const floorH = b.height / floors;
+  const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
+  const yTop = b.baseY + b.height;
+  const y1 = yb + floorH; // sostre del porxo
+  if (b.minHeight <= 0 && b.footY < yb) f.front(k.concrete, 0, L, b.footY, yb, 0);
+  f.parapet(k.concrete, yTop, 0.6, 0.3);
+
+  // Planta baixa: porxo als trams llargs, maó massís als curts.
+  if (L >= 8) {
+    const D = -K.portico;
+    const n = Math.max(1, Math.round(L / K.pillarSpacing));
+    const hp = K.pillar / 2;
+    // Paret del fons: sòcol de maó i vidre.
+    f.front(k.brick, 0, L, yb, yb + 0.6, D);
+    f.front(k.glass, 0, L, yb + 0.6, y1 - 0.4, D);
+    f.front(k.concrete, 0, L, y1 - 0.4, y1, D);
+    // Sostre del porxo i caps dels extrems.
+    f.flat(k.concrete, 0, L, y1, 0, D, false);
+    f.side(k.concrete, 0, yb, y1, 0, D, f.U);
+    f.side(k.concrete, L, yb, y1, 0, D, f.Um);
+    for (let i = 0; i <= n; i++) {
+      const t = (i * L) / n;
+      const t0 = Math.max(0, t - hp);
+      const t1 = Math.min(L, t + hp);
+      f.front(k.concrete, t0, t1, yb, y1, 0);
+      f.front(k.concrete, t0, t1, yb, y1, -K.pillar, {}, true);
+      if (i > 0) f.side(k.concrete, t0, yb, y1, 0, -K.pillar, f.Um);
+      if (i < n) f.side(k.concrete, t1, yb, y1, 0, -K.pillar, f.U);
+    }
+  } else {
+    f.front(k.brick, 0, L, yb, y1, 0);
+  }
+
+  // Plantes de maó amb finestres retallades.
+  const topY = yTop - K.cornice;
+  f.front(k.concrete, 0, L, topY, yTop, 0); // cornisa
+  f.front(k.concrete, 0, L, y1, y1 + 0.35, 0); // cantell del forjat del porxo
+  const n = Math.max(1, Math.round(L / K.windowSpacing));
+  const w = L / n;
+  const ww = Math.min(K.windowWidth, w * 0.5);
+  const D = -K.reveal;
+  for (let fl = 1; fl < floors; fl++) {
+    const y0 = fl === 1 ? y1 + 0.35 : yb + fl * floorH;
+    const yf = Math.min(topY, yb + (fl + 1) * floorH);
+    if (yf <= y0 + 0.5) continue;
+    const wy0 = y0 + Math.min(0.9, (yf - y0) * 0.3);
+    const wy1 = yf - Math.min(0.45, (yf - y0) * 0.14);
+    if (L < 2 || wy1 <= wy0) {
+      f.front(k.brick, 0, L, y0, yf, 0);
+      continue;
+    }
+    for (let i = 0; i < n; i++) {
+      const t0 = i * w;
+      const wx0 = t0 + (w - ww) / 2;
+      const wx1 = wx0 + ww;
+      f.front(k.brick, t0, wx0, y0, yf, 0);
+      f.front(k.brick, wx1, t0 + w, y0, yf, 0);
+      f.front(k.brick, wx0, wx1, y0, wy0, 0);
+      f.front(k.brick, wx0, wx1, wy1, yf, 0);
+      f.side(k.brick, wx0, wy0, wy1, 0, D, f.U);
+      f.side(k.brick, wx1, wy0, wy1, 0, D, f.Um);
+      f.flat(k.concrete, wx0, wx1, wy0, 0, D, true);
+      f.flat(k.brick, wx0, wx1, wy1, 0, D, false);
+      f.front(k.glass, wx0, wx1, wy0, wy1, D);
+      // Fusteria (marc exterior i travesser).
+      f.front(k.metal, wx0, wx1, wy1 - 0.06, wy1, D + 0.02);
+      f.front(k.metal, wx0, wx1, wy0 + (wy1 - wy0) * 0.35, wy0 + (wy1 - wy0) * 0.35 + 0.05, D + 0.02);
     }
   }
 }
@@ -614,6 +706,7 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
         if (Math.hypot(c[0] - a[0], c[1] - a[1]) < 0.05) continue;
         const f = new EdgeFrame(a, c, b.baseY);
         if (b.facade === "campus") campusEdge(f, b, k);
+        else if (b.facade === "arcade") arcadeEdge(f, b, k);
         else if (b.facade === "glass") glassEdge(f, b, k, rgb);
         else punchedEdge(f, b, k, rgb);
       }

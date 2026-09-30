@@ -51,10 +51,12 @@ export type BuildingKind = "university" | "office" | "dormitory" | "sports" | "p
  *  - glass: franges de vidre (Omega, BSC, Biblioteca…)
  *  - punched: finestres retallades en paret massissa (habitatges, Nexus II…)
  *  - strips: finestres en franja (per defecte)
+ *  - arcade: fila A: porxo de pilars de formigó a la planta baixa, maó amb finestres retallades a sobre i cornisa
  */
-export type FacadeStyle = "strips" | "campus" | "glass" | "punched";
+export type FacadeStyle = "strips" | "campus" | "glass" | "punched" | "arcade";
 
-export const FACADE_STYLES: readonly FacadeStyle[] = ["strips", "campus", "glass", "punched"];
+// L'ordre és l'índex que rep el shader (atribut facade.w): afegiu estils nous al final.
+export const FACADE_STYLES: readonly FacadeStyle[] = ["strips", "campus", "glass", "punched", "arcade"];
 
 export type EntranceKind = "main" | "secondary" | "service" | "other";
 
