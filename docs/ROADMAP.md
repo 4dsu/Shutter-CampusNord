@@ -36,7 +36,7 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [x] Textures procedurals pròpies (sense imatges externes) i kit `arcade` de la fila A a partir de fotos de referència de Mapillary
 - [x] Porxo de la fila A caminable (`buildArcadeCollision`, amb test)
 - [x] Estils nous a partir de fotos de referència: B3 `brick` (franja vertical de vidre, vidrieres, lamel·les), Biblioteca `stone`, Nexus II mur cortina, BSC `fins` (lamel·les verticals)
-- [ ] Biblioteca: façana inclinada i gran obertura en diagonal; rètol de Telecos a B3
+- [x] Biblioteca: gran tall en diagonal a la façana principal (enfonsat, perquè no sobresurti de la col·lisió); rètol de l'ETSETB a B3 (`sign`)
 - [ ] Edificis singulars a partir de fotos (`docs/FOTOS.md`)
 - [ ] Terrasses i murs de contenció amb desnivell sec; escales amb graons
 - [ ] Render: ombres en cascada, SSAO, arbres segons espècie, opció de qualitat baixa

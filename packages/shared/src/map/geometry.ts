@@ -681,31 +681,65 @@ function brickEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
   }
 }
 
-/** Biblioteca: plaques massisses de pedra clara, sense finestres a dalt, i una franja de vidre fosc a la planta baixa. */
-function stoneEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders): void {
+/** Mides de l'obertura en diagonal de la Biblioteca (fraccions del tram i m), a partir de fotos de referència. */
+// El tall queda al primer terç del tram perquè el rètol (centrat a dalt) no el tapi.
+export const LIBRARY_CUT = { start: 0.04, drift: 0.18, width: 0.13, depth: 2.5 } as const;
+
+/**
+ * Biblioteca: plaques massisses de pedra clara i una franja de vidre fosc a la planta baixa. A la façana principal
+ * (`main`), un gran tall en diagonal enfonsat que puja cap a un costat (tret característic de l'edifici).
+ */
+function stoneEdge(f: EdgeFrame, b: BuildingData, k: KitBuilders, main: boolean): void {
   const L = f.L;
   const yb = b.baseY + (b.minHeight > 0 ? b.minHeight : 0);
   const yTop = b.baseY + b.height;
   if (b.minHeight <= 0 && b.footY < yb) f.front(k.stone, 0, L, b.footY, yb, 0);
   const glassTop = yb + Math.min(4.2, b.height * 0.3);
   const D = -0.5;
-  if (L >= 6) {
-    // Planta baixa vidrada i enfonsada sota la massa de pedra.
-    f.front(k.glass, 0, L, yb, glassTop, D);
-    f.flat(k.stone, 0, L, glassTop, 0, D, false);
-    f.side(k.stone, 0, yb, glassTop, 0, D, f.U);
-    f.side(k.stone, L, yb, glassTop, 0, D, f.Um);
-    const m = Math.max(1, Math.round(L / 1.8));
-    for (let i = 1; i < m; i++) {
-      const t = (i * L) / m;
-      f.front(k.metal, t - 0.04, t + 0.04, yb, glassTop, D + 0.02);
-    }
-    f.front(k.stone, 0, L, glassTop, yTop, 0);
-  } else {
+  if (L < 6) {
     f.front(k.stone, 0, L, yb, yTop, 0);
+    f.parapet(k.stone, yTop, 0.5, 0.35);
+    return;
   }
-  // Coronament: capçal de pedra lleugerament més alt.
+  // Planta baixa vidrada i enfonsada sota la massa de pedra.
+  f.front(k.glass, 0, L, yb, glassTop, D);
+  f.flat(k.stone, 0, L, glassTop, 0, D, false);
+  f.side(k.stone, 0, yb, glassTop, 0, D, f.U);
+  f.side(k.stone, L, yb, glassTop, 0, D, f.Um);
+  const m = Math.max(1, Math.round(L / 1.8));
+  for (let i = 1; i < m; i++) {
+    const t = (i * L) / m;
+    f.front(k.metal, t - 0.04, t + 0.04, yb, glassTop, D + 0.02);
+  }
   f.parapet(k.stone, yTop, 0.5, 0.35);
+  if (!main) {
+    f.front(k.stone, 0, L, glassTop, yTop, 0);
+    return;
+  }
+
+  // Tall en diagonal: paral·lelogram que va de (x0, glassTop) fins a (x0 + s, yTop), d'amplada w.
+  const C = LIBRARY_CUT;
+  const x0 = L * C.start;
+  const s = L * C.drift;
+  const w = L * C.width;
+  const H = yTop - glassTop;
+  const Dc = -C.depth;
+  const bse = b.baseY;
+  const uv = (t: number, y: number): [number, number] => [t, y - bse];
+  const face = (mb: MeshBuilder, pts: [number, number, number][], n: P3): void =>
+    quad(mb, pts.map(([t, y, d]) => f.P(t, y, d)) as [P3, P3, P3, P3], n, pts.map(([t, y]) => uv(t, y)));
+  // Pedra a banda i banda del tall.
+  face(k.stone, [[0, glassTop, 0], [x0, glassTop, 0], [x0 + s, yTop, 0], [0, yTop, 0]], f.N);
+  face(k.stone, [[x0 + w, glassTop, 0], [L, glassTop, 0], [L, yTop, 0], [x0 + s + w, yTop, 0]], f.N);
+  // Fons del tall: vidre fosc.
+  face(k.glass, [[x0, glassTop, Dc], [x0 + w, glassTop, Dc], [x0 + s + w, yTop, Dc], [x0 + s, yTop, Dc]], f.N);
+  // Cares laterals inclinades del tall (normal perpendicular a la diagonal, dins del pla de la façana).
+  const len = Math.hypot(s, H);
+  const toWorld = (nt: number, ny: number): P3 => [f.U[0] * nt, ny, f.U[2] * nt];
+  face(k.stone, [[x0, glassTop, 0], [x0 + s, yTop, 0], [x0 + s, yTop, Dc], [x0, glassTop, Dc]], toWorld(H / len, -s / len));
+  face(k.stone, [[x0 + w, glassTop, 0], [x0 + w + s, yTop, 0], [x0 + w + s, yTop, Dc], [x0 + w, glassTop, Dc]], toWorld(-H / len, s / len));
+  // Sostre del tall a baix (sobre la franja vidrada) i coronament obert a dalt.
+  f.flat(k.stone, x0, x0 + w, glassTop, 0, Dc, true);
 }
 
 /** BSC: mur de vidre enfonsat amb lamel·les verticals blanques cada 0,6 m i forjats marcats. */
@@ -834,6 +868,17 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
   for (const b of buildings) {
     if (!hasFacadeKit(b)) continue;
     const rgb = hexToRgb(b.color);
+    // Tram més llarg del contorn: hi van els elements singulars (tall de la Biblioteca).
+    let mainEdge = 0;
+    let mainLen = 0;
+    b.footprint.forEach((a, i) => {
+      const c = b.footprint[(i + 1) % b.footprint.length];
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (len > mainLen) {
+        mainLen = len;
+        mainEdge = i;
+      }
+    });
     for (const ring of [b.footprint, ...b.holes]) {
       for (let e = 0; e < ring.length; e++) {
         const a = ring[e];
@@ -844,7 +889,7 @@ export function buildFacadeKits(buildings: readonly BuildingData[]): FacadeKitMe
         else if (b.facade === "arcade") arcadeEdge(f, b, k);
         else if (b.facade === "glass") glassEdge(f, b, k, rgb);
         else if (b.facade === "brick") brickEdge(f, b, k);
-        else if (b.facade === "stone") stoneEdge(f, b, k);
+        else if (b.facade === "stone") stoneEdge(f, b, k, ring === b.footprint && e === mainEdge && b.label !== undefined);
         else if (b.facade === "fins") finsEdge(f, b, k);
         else punchedEdge(f, b, k, rgb);
       }

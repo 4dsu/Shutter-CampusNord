@@ -9,6 +9,7 @@ export interface BuildingOverride {
   id?: string;
   name?: string;
   label?: string;
+  sign?: string;
   kind?: BuildingKind;
   levels?: number;
   height?: number;
@@ -30,7 +31,14 @@ export const BUILDING_OVERRIDES: Record<number, BuildingOverride> = {
   595330170: { id: "B0" },
   642719986: { id: "B1" },
   642719985: { id: "B2" },
-  1124652469: { id: "B3", name: "B3 · ETSETB (Telecos)", label: "B3", facade: "brick", color: "#b0583b" },
+  1124652469: {
+    id: "B3",
+    name: "B3 · ETSETB (Telecos)",
+    label: "B3",
+    sign: "Escola Tècnica Superior d'Enginyeria de Telecomunicació de Barcelona",
+    facade: "brick",
+    color: "#b0583b",
+  },
   // B4 està renovat: plafons clars amb finestres verticals (foto de referència).
   642719995: { id: "B4", facade: "punched", color: "#e2ded5" },
   1124652470: { id: "B5" },

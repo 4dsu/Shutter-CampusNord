@@ -97,7 +97,7 @@ describe("geometria del mapa", () => {
     // Rectangle 30 × 12 m en ordre positiu, 3 plantes.
     const fp: [number, number][] = [[0, 0], [0, -12], [30, -12], [30, 0]];
     for (const facade of ["campus", "glass", "punched", "arcade", "brick", "stone", "fins"] as const) {
-      const kit = buildFacadeKits([building(fp, { facade, levels: 3, height: 11.4 })]);
+      const kit = buildFacadeKits([building(fp, { facade, levels: 3, height: 11.4, label: "X" })]); // amb rètol: façana principal (tall de la Biblioteca)
       for (const mesh of [kit.brick, kit.concrete, kit.glass, kit.metal, kit.plaster, kit.stone]) {
         if (mesh.indices.length) expectWindingMatchesNormals(mesh);
         // Res no sobresurt del pla de la façana (la col·lisió és la closca exterior).

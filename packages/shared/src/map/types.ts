@@ -75,6 +75,8 @@ export interface BuildingData {
   name: string;
   /** Rètol gran pintat a la façana ("A5", "B6", "Ω"). */
   label?: string;
+  /** Rètol institucional en lletres de metall sobre l'entrada (façana principal, sobre la planta baixa). */
+  sign?: string;
   kind: BuildingKind;
   /** Anell exterior en sentit antihorari en el pla x-z (àrea amb signe positiva, vegeu geo.signedArea). */
   footprint: Vec2[];
