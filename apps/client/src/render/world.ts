@@ -55,18 +55,18 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   const group = new THREE.Group();
   group.name = "world";
 
-  // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
-  const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
-  const groundTex = ortho ? orthoTexture(ortho, renderer) : groundTexture(groundImage as HTMLCanvasElement, renderer);
-  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho));
-  ground.name = "terrain";
-  ground.receiveShadow = true;
-  group.add(ground);
-
   const aniso = renderer.capabilities.getMaxAnisotropy();
   const bricks = loadPbr("bricks", 1.2, 1.2, aniso);
   const concreteTex = loadPbr("concrete", 2, 1, aniso);
   const plaster = loadPbr("plaster", 2, 1, aniso);
+
+  // Terra: l'ortofoto real si n'hi ha; si no, el terra pintat a partir de les zones d'OSM.
+  const groundImage: CanvasImageSource = ortho ?? bakeGround(map, terrain, 0.25);
+  const groundTex = ortho ? orthoTexture(ortho, renderer) : groundTexture(groundImage as HTMLCanvasElement, renderer);
+  const ground = new THREE.Mesh(toBufferGeometry(buildTerrainMesh(terrain)), createTerrainMaterial(groundTex, !!ortho, ortho ? { concrete: concreteTex, brick: bricks } : undefined));
+  ground.name = "terrain";
+  ground.receiveShadow = true;
+  group.add(ground);
 
   // Terrats de tots els edificis; parets llises (amb finestres al shader) només dels que no tenen kit de façana.
   const { roofs } = buildBuildingsMesh(map.buildings);

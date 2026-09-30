@@ -105,15 +105,28 @@ roughnessFactor = mix(roughnessFactor, 0.15, facadeGlass);`,
   return mat;
 }
 
+export interface TerrainDetail {
+  /** Formigó/pedra per a places i voreres. */
+  concrete: { map: THREE.Texture; normalMap: THREE.Texture };
+  /** Maó, reutilitzat com a paviment de maó dels passeigs. */
+  brick: { map: THREE.Texture; normalMap: THREE.Texture };
+}
+
 /**
- * Terreny: textura del terra + soroll de detall perquè de prop no es vegi borrós.
- * `photo` indica que la textura és una fotografia aèria, que ja porta la llum del sol: s'enfosqueix perquè
- * no quedi il·luminada dues vegades.
+ * Terreny.
+ * - `photo`: la textura és l'ortofoto. Ja porta la llum del sol i s'enfosqueix perquè no quedi il·luminada dues vegades.
+ * - `detail`: de prop (< ~60 m) la foto se substitueix per materials en mosaic segons el color de cada punt de la foto
+ *   (vermellós → paviment de maó, verd → gespa, la resta → formigó). Així el terra es veu nítid i sense les taques
+ *   d'arbres i ombres de la foto; de lluny es continua veient la foto real.
  */
-export function createTerrainMaterial(ground: THREE.Texture, photo = false): THREE.MeshStandardMaterial {
+export function createTerrainMaterial(ground: THREE.Texture, photo = false, detail?: TerrainDetail): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ map: ground, roughness: 0.95, metalness: 0 });
   if (photo) mat.color.setScalar(0.62);
   mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uConcreteMap = { value: detail?.concrete.map ?? null };
+    shader.uniforms.uConcreteNormal = { value: detail?.concrete.normalMap ?? null };
+    shader.uniforms.uBrickMap = { value: detail?.brick.map ?? null };
+    shader.uniforms.uBrickNormal = { value: detail?.brick.normalMap ?? null };
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vTerrainPos;")
       .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvTerrainPos = (modelMatrix * vec4(transformed, 1.0)).xyz;");
@@ -122,6 +135,10 @@ export function createTerrainMaterial(ground: THREE.Texture, photo = false): THR
         "#include <common>",
         `#include <common>
 varying vec3 vTerrainPos;
+uniform sampler2D uConcreteMap;
+uniform sampler2D uConcreteNormal;
+uniform sampler2D uBrickMap;
+uniform sampler2D uBrickNormal;
 float terrainNoise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p);
   float a = fract(sin(dot(i, vec2(12.9898, 78.233))) * 43758.5453);
@@ -130,17 +147,67 @@ float terrainNoise(vec2 p) {
   float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(12.9898, 78.233))) * 43758.5453);
   vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}`,
+}
+float terrainNear;
+vec3 terrainWeights; // x = maó, y = gespa, z = formigó
+vec2 terrainConcreteUv;
+vec2 terrainBrickUv;`,
       )
       .replace(
         "#include <map_fragment>",
         `#include <map_fragment>
 {
   float n = terrainNoise(vTerrainPos.xz * 1.7) * 0.5 + terrainNoise(vTerrainPos.xz * 6.3) * 0.3 + terrainNoise(vTerrainPos.xz * 0.35) * 0.2;
-  diffuseColor.rgb *= 0.9 + 0.2 * n;
+  diffuseColor.rgb *= 0.92 + 0.16 * n;
+  terrainNear = ${detail ? "1.0 - smoothstep(18.0, 65.0, length(vTerrainPos - cameraPosition))" : "0.0"};
+  ${
+    detail
+      ? `vec3 o = sampledDiffuseColor.rgb;
+  // Classificació amb la foto desenfocada (mip de ~3 m): ombres i copes d'arbre no trenquen les zones.
+  vec3 oc = textureLod(map, vMapUv, 3.5).rgb;
+  float sum = max(0.02, oc.r + oc.g + oc.b);
+  float rr = oc.r / sum;
+  float gg = oc.g / sum;
+  // Transicions curtes, lleugerament trencades amb soroll perquè les vores no siguin taques rodones.
+  float edge = (terrainNoise(vTerrainPos.xz * 3.1) - 0.5) * 0.02;
+  float wGrass = smoothstep(0.385, 0.405, gg + edge);
+  float wBrick = smoothstep(0.435, 0.455, rr + edge) * (1.0 - wGrass);
+  float wConcrete = max(0.0, 1.0 - wGrass - wBrick);
+  terrainWeights = vec3(wBrick, wGrass, wConcrete);
+  terrainConcreteUv = vTerrainPos.xz / vec2(2.0, 1.0);
+  terrainBrickUv = vTerrainPos.zx / 0.7; // paviment: maons més petits i girats
+  vec3 concreteC = texture(uConcreteMap, terrainConcreteUv).rgb * vec3(0.6, 0.59, 0.56);
+  vec3 brickC = texture(uBrickMap, terrainBrickUv).rgb * vec3(0.78, 0.62, 0.58);
+  float g1 = terrainNoise(vTerrainPos.xz * 9.0);
+  float g2 = terrainNoise(vTerrainPos.xz * 37.0);
+  vec3 grassC = mix(vec3(0.045, 0.085, 0.02), vec3(0.09, 0.14, 0.035), g1) * (0.8 + 0.4 * g2);
+  vec3 near = brickC * wBrick + grassC * wGrass + concreteC * wConcrete;
+  // Conserva una part de la llum de la foto (zones d'ombra real), però sense les taques.
+  float lo = dot(o, vec3(0.299, 0.587, 0.114));
+  float ln = max(0.02, dot(near, vec3(0.299, 0.587, 0.114)));
+  near *= mix(1.0, clamp(lo / ln, 0.55, 1.4), 0.35);
+  diffuseColor.rgb = mix(diffuseColor.rgb, near, terrainNear);`
+      : ""
+  }
+}`,
+      )
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+${
+  detail
+    ? `{
+  // Relleu dels materials de prop: normal del mosaic (espai tangent ≈ x, z del món) passada a espai de vista.
+  vec3 nc = texture(uConcreteNormal, terrainConcreteUv).xyz * 2.0 - 1.0;
+  vec3 nb = texture(uBrickNormal, terrainBrickUv).xyz * 2.0 - 1.0;
+  vec3 dn = nc * terrainWeights.z + nb.yxz * terrainWeights.x;
+  vec3 bump = (viewMatrix * vec4(dn.x, 0.0, -dn.y, 0.0)).xyz;
+  normal = normalize(normal + bump * 0.8 * terrainNear);
+}`
+    : ""
 }`,
       );
   };
-  mat.customProgramCacheKey = () => "terrain-v1";
+  mat.customProgramCacheKey = () => `terrain-v3-${detail ? "detail" : "plain"}`;
   return mat;
 }
