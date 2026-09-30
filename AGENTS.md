@@ -50,6 +50,10 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 | `apps/server/src/` | Servidor HTTP + WebSocket (`index.ts`), fitxers estàtics (`static.ts`) |
 | `tools/map-import/src/` | Importador: `osm.ts`, `dem.ts`, `build.ts`, `overrides.ts`, `projection.ts` |
 | `assets/maps/campus-nord.json` | Mapa generat. **No l'editis a mà**: canvia l'importador o `overrides.ts` i torna a executar-lo |
+| `assets/maps/campus-nord-orto.jpg`, `campus-nord-reference.json` | Ortofoto de l'ICGC (terra i terrats) i parts del Cadastre per a l'editor (`?mode=editor`) |
+| `assets/textures/` | Textures PBR CC0 (color, normal, rugositat) amb la mida real de cada repetició al `LICENSE.md` |
+| `tools/map-import/src/catastro*.ts`, `orthophoto.ts` | Descàrrega del Cadastre i de l'ortofoto; fusió dels edificis OSM amb el Cadastre |
+| `docs/FOTOS.md` | Llista de fotos del campus que es necessiten (i on pujar-les) |
 
 ## 4. Convencions obligatòries
 
@@ -78,6 +82,9 @@ Abans de cada push, **`npm run typecheck` i `npm test` han de passar**. La CI ho
 
 - **El que es veu i el que col·lisiona surten de les mateixes funcions** (`buildTerrainMesh`, `buildBuildingsMesh`, `buildWallsMesh`).
   No facis una col·lisió "a part" que pugui divergir del render.
+- **Excepció: el relleu decoratiu** (`buildCampusFacades`) és només de render.
+  - No pot sobresortir del pla de la closca de col·lisió: tot va cap endins, i un test ho comprova.
+  - La closca de parets d'aquests edificis serveix per a les col·lisions, però no es dibuixa.
 - Totes les cares miren cap a fora (ordre antihorari vist des de fora). Hi ha tests que ho comproven: afegeix-n'hi si crees geometria nova.
 
 ### Render (client)
@@ -135,6 +142,11 @@ Hi treballen diverses persones, cadascuna amb el seu agent. Per no barrejar fein
   - Respecta la política d'ús: l'importador guarda les descàrregues a `tools/map-import/.cache/` (ignorada per git).
   - Fes servir `--refresh` només quan calgui.
 - **Edificis sense nom a OSM:** A4, A5, A6, B3 i B6 no tenen nom i s'identifiquen per id de via a `tools/map-import/src/overrides.ts`.
+- **Font de cada edifici del campus:**
+  - Geometria i plantes: si hi ha parts del Cadastre, surten d'allà (`catastroMerge.ts`).
+  - Nom, rètol, estil i interior: d'OSM i `overrides.ts`.
+  - Si el Cadastre diu 0 plantes sobre rasant, l'edifici és soterrat i no es dibuixa.
+- **Ortofoto:** és una foto real, així que ja porta ombres i llum. Els materials que la fan servir s'enfosqueixen (×0,62) perquè no quedi il·luminada dues vegades.
 - **Parts d'edificis:** un edifici amb `building:part` es divideix en volums (`A5-p0`, `A5-p1`…). L'interior i el rètol van a la part més gran.
 - **Dades ODbL:** qualsevol canvi a `assets/maps/` ha de mantenir l'atribució (`map.attribution`, `assets/maps/LICENSE.md`).
 - **Node:** el servidor s'executa amb `node --watch src/index.ts`, no amb `tsx`. Si Node es queixa de sintaxi, segurament has fet servir sintaxi no esborrable.

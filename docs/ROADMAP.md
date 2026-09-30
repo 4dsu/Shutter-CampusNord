@@ -23,6 +23,20 @@ Llegenda: ✅ fet · 🚧 en curs · ⏳ pendent
 - [ ] Millora pendent: murs de contenció amb desnivell sec (ara el terreny hi fa una rampa suau)
 - [ ] Millora pendent: textura de terra més nítida de prop (textura de detall o decals de camí)
 
+## Fase 1b — Campus fidel i amb textures reals 🚧 (PR #2, branca `fase-1b/fidelitat`)
+
+- [x] Ortofoto de l'ICGC 25 cm (2025) com a terra i textura dels terrats
+- [x] Edificis del campus amb les parts del Cadastre (contorns oficials, plantes reals); soterranis eliminats (Poliesportiu); informe OSM → Cadastre
+- [x] Editor `?mode=editor`: ortofoto + edificis del joc + Cadastre per comparar
+- [x] Kit de façana A–D amb relleu real (formigó, maó enfonsat, finestres amb lamel·les) i textures PBR CC0
+- [ ] Fila A, B2–B5 i B0 (el Cadastre no les té): corregir contorns amb l'editor
+- [ ] Editor: moure vèrtexs, marcar porxos, places, terrasses, escales i murs → `tools/map-import/corrections.json`
+- [ ] Kits per als altres estils (mur cortina de vidre per a Omega/BSC, finestres retallades amb relleu)
+- [ ] Edificis singulars a partir de fotos (`docs/FOTOS.md`)
+- [ ] Terrasses i murs de contenció amb desnivell sec; escales amb graons
+- [ ] Render: ombres en cascada, SSAO, arbres segons espècie, opció de qualitat baixa
+- [ ] Alçades amb el model de superfícies (LiDAR) de l'ICGC, si és accessible
+
 ## Fase 2 — FPS en solitari 🚧 (PR #1, branca `fase-2/fps-en-solitari`)
 
 - [x] Món de col·lisions Rapier compartit (`packages/shared/src/physics/`): terreny, edificis, murs, límit jugable i objectes (troncs, fanals, bancs…)
