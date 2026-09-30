@@ -4,7 +4,8 @@ import {
   MAP_FORMAT_VERSION,
   TerrainField,
   buildBuildingsMesh,
-  buildCampusFacades,
+  buildFacadeKits,
+  hasFacadeKit,
   buildTerrainMesh,
   buildWallsMesh,
 } from "@shutter/shared/map";
@@ -68,9 +69,9 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   ground.receiveShadow = true;
   group.add(ground);
 
-  // Terrats de tots els edificis; parets llises (amb finestres al shader) només dels que no tenen kit de façana.
+  // Terrats de tots els edificis; parets llises (amb finestres al shader) només dels que no tenen façana amb relleu.
   const { roofs } = buildBuildingsMesh(map.buildings);
-  const { walls } = buildBuildingsMesh(map.buildings.filter((b) => b.facade !== "campus"));
+  const { walls } = buildBuildingsMesh(map.buildings.filter((b) => !hasFacadeKit(b)));
   const facadeMaterial = createFacadeMaterial();
   Object.assign(facadeMaterial, plaster);
   const facades = new THREE.Mesh(toBufferGeometry(walls), facadeMaterial);
@@ -78,20 +79,21 @@ export function createWorld({ map, terrain, ortho }: LoadedMap, renderer: THREE.
   facades.castShadow = true;
   facades.receiveShadow = true;
 
-  // Kit de façana A–D: formigó, maó, vidre i lamel·les amb relleu real.
-  const kit = buildCampusFacades(map.buildings);
+  // Façanes amb relleu: A–D (formigó, maó, lamel·les), mur cortina i finestres retallades.
+  const kit = buildFacadeKits(map.buildings);
   const kitMaterials = {
     // Tint una mica més vermell i fosc: de lluny el mosaic es veia massa taronja (foto real de B3).
     brick: new THREE.MeshStandardMaterial({ ...bricks, color: 0xc49a8c, roughness: 1 }),
     concrete: new THREE.MeshStandardMaterial({ ...concreteTex, color: 0xd8d4cc, roughness: 1 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x1c252e, roughness: 0.06, metalness: 0.3, envMapIntensity: 1.4 }),
-    louver: new THREE.MeshStandardMaterial({ color: 0xdcdcd6, roughness: 0.55, metalness: 0.2 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xcfd1cf, roughness: 0.45, metalness: 0.4 }),
+    plaster: new THREE.MeshStandardMaterial({ ...plaster, vertexColors: true, roughness: 1 }),
   };
-  for (const key of ["brick", "concrete", "glass", "louver"] as const) {
+  for (const key of ["brick", "concrete", "glass", "metal", "plaster"] as const) {
     const mesh = new THREE.Mesh(toBufferGeometry(kit[key]), kitMaterials[key]);
     mesh.name = `kit-${key}`;
-    // Només la graella de formigó projecta ombra: el maó, el vidre i les lamel·les són enfonsats i en fan poca.
-    mesh.castShadow = key === "concrete";
+    // Només les superfícies exteriors projecten ombra; el maó, el vidre i el metall són enfonsats i en fan poca.
+    mesh.castShadow = key === "concrete" || key === "plaster";
     mesh.receiveShadow = true;
     group.add(mesh);
   }
