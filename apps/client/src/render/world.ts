@@ -9,7 +9,7 @@ import {
 } from "@shutter/shared/map";
 import { bakeGround, groundTexture } from "./groundTexture.ts";
 import { createLabels } from "./labels.ts";
-import { createFacadeMaterial, createTerrainMaterial } from "./materials.ts";
+import { createFacadeMaterial, createRoofMaterial, createTerrainMaterial } from "./materials.ts";
 import { toBufferGeometry } from "./meshes.ts";
 import { createProps } from "./props.ts";
 
@@ -46,7 +46,7 @@ export function createWorld({ map, terrain }: LoadedMap, renderer: THREE.WebGLRe
   facades.name = "facades";
   facades.castShadow = true;
   facades.receiveShadow = true;
-  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  const roofMesh = new THREE.Mesh(toBufferGeometry(roofs), createRoofMaterial());
   roofMesh.name = "roofs";
   roofMesh.castShadow = true;
   roofMesh.receiveShadow = true;

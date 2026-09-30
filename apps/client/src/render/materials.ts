@@ -31,7 +31,8 @@ float facadeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.
 float facadePulse(float x, float a, float b, float w) {
   return smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x);
 }
-float facadeGlass;`,
+float facadeGlass;
+float facadeShade = 0.0;`,
       )
       .replace(
         "#include <color_fragment>",
@@ -73,6 +74,12 @@ float facadeGlass;`,
     glass *= 0.75 + 0.25 * step(0.5, fract(v * 3.0)); // lamel·les
     glassAvg = 0.17;
     frame = max(frame, step(totalH - 0.8, v));
+    // Porxos a la planta baixa dels edificis alts (fila A): pilars de formigó i l'interior en ombra.
+    float porch = step(level, 0.5) * step(0.0, v) * step(15.0, totalH);
+    float pillar = 1.0 - facadePulse(fx, 0.14, 0.86, wu);
+    frame = mix(frame, max(pillar, facadePulse(fy, 0.9, 1.01, wv)), porch);
+    glass *= 1.0 - porch;
+    facadeShade = porch * (1.0 - pillar) * facadePulse(fy, -0.1, 0.9, wv);
   } else if (style < 2.5) {
     // glass: franges de vidre amb muntants cada 1,6 m.
     bay = 1.6;
@@ -93,6 +100,7 @@ float facadeGlass;`,
   float tint = facadeHash(vec2(floor(u / bay), level) + seed * 17.0);
   vec3 glassColor = mix(vec3(0.023, 0.032, 0.045), vec3(0.048, 0.069, 0.09), tint); // vidre fosc (lineal)
   diffuseColor.rgb = mix(diffuseColor.rgb, glassColor, facadeGlass);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.035, 0.03, 0.027), facadeShade * (1.0 - 0.5 * fade)); // ombra (lineal)
 }`,
       )
       .replace(
@@ -101,7 +109,42 @@ float facadeGlass;`,
 roughnessFactor = mix(roughnessFactor, 0.15, facadeGlass);`,
       );
   };
-  mat.customProgramCacheKey = () => "facade-v2";
+  mat.customProgramCacheKey = () => "facade-v3";
+  return mat;
+}
+
+/**
+ * Terrats i places sobre edificis: color del vèrtex amb un enllosat suau (uv = x, z en metres) perquè de prop,
+ * caminant per sobre (p. ex. la Plaça de les Constel·lacions), no sigui una superfície llisa.
+ */
+export function createRoofMaterial(): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vRoofUv;")
+      .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRoofUv = uv;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+varying vec2 vRoofUv;
+float roofHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`,
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+{
+  vec2 g = vRoofUv / 1.5;
+  vec2 w = fwidth(g);
+  vec2 f = fract(g);
+  float joint = max(1.0 - smoothstep(0.0, 0.04 + w.x, min(f.x, 1.0 - f.x)), 1.0 - smoothstep(0.0, 0.04 + w.y, min(f.y, 1.0 - f.y)));
+  float fade = clamp(max(w.x, w.y) * 2.0 - 0.3, 0.0, 1.0);
+  float slab = 0.94 + 0.08 * roofHash(floor(g));
+  diffuseColor.rgb *= mix(slab * (1.0 - 0.18 * joint), 0.97, fade);
+}`,
+      );
+  };
+  mat.customProgramCacheKey = () => "roof-v1";
   return mat;
 }
 
